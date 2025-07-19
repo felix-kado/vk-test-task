@@ -1,0 +1,226 @@
+basePath: /v1
+definitions:
+  domain.Ad:
+    properties:
+      createdAt:
+        type: string
+      id:
+        format: int64
+        type: integer
+      imageURL:
+        type: string
+      price:
+        description: cents
+        format: int64
+        type: integer
+      text:
+        type: string
+      title:
+        type: string
+      userID:
+        format: int64
+        type: integer
+    type: object
+  http.AdRequest:
+    properties:
+      image_url:
+        type: string
+      price:
+        type: integer
+      text:
+        type: string
+      title:
+        type: string
+    type: object
+  http.LoginRequest:
+    properties:
+      login:
+        type: string
+      password:
+        type: string
+    type: object
+  http.RegistrationRequest:
+    properties:
+      login:
+        type: string
+      password:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: This is a simple marketplace API.
+  title: Marketplace API
+  version: "1.0"
+paths:
+  /ads:
+    get:
+      description: Returns a list of ads, with optional sorting.
+      parameters:
+      - description: Sort by field (price or created_at)
+        enum:
+        - price
+        - created_at
+        in: query
+        name: sort_by
+        type: string
+      - description: Sort order (asc or desc)
+        enum:
+        - asc
+        - desc
+        in: query
+        name: order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Ad'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List ads
+      tags:
+      - ads
+    post:
+      consumes:
+      - application/json
+      description: Creates a new ad for the authenticated user.
+      parameters:
+      - description: Ad Info
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/http.AdRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              format: int64
+              type: integer
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new ad
+      tags:
+      - ads
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a user and returns a JWT token.
+      parameters:
+      - description: Login Credentials
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/http.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Log in a user
+      tags:
+      - auth
+  /register:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user and returns their ID.
+      parameters:
+      - description: Registration Info
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/http.RegistrationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              format: int64
+              type: integer
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Register a new user
+      tags:
+      - auth
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
