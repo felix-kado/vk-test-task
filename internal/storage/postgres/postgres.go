@@ -57,14 +57,18 @@ func (s *Storage) CreateUser(ctx context.Context, u *domain.User) error {
 
 // FindByLogin finds a user by their login.
 func (s *Storage) FindByLogin(ctx context.Context, login string) (*domain.User, error) {
-	q := `SELECT id, login, password_hash, created_at FROM users WHERE login = $1`
+	const q = `SELECT id, login, password_hash, created_at FROM users WHERE login = $1`
 
-	var u domain.User
-	err := s.pool.QueryRow(ctx, q, login).Scan(&u.ID, &u.Login, &u.PasswordHash, &u.CreatedAt)
+	rows, err := s.pool.Query(ctx, q, login)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, storage.ErrNotFound
-		}
+		return nil, fmt.Errorf("storage.FindByLogin: %w", err)
+	}
+
+	u, err := pgx.CollectOneRow(rows, pgx.RowToStructByNameLax[domain.User])
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, storage.ErrNotFound
+	}
+	if err != nil {
 		return nil, fmt.Errorf("storage.FindByLogin: %w", err)
 	}
 
@@ -75,12 +79,16 @@ func (s *Storage) FindByLogin(ctx context.Context, login string) (*domain.User, 
 func (s *Storage) FindUserByID(ctx context.Context, id int64) (*domain.User, error) {
 	q := `SELECT id, login, password_hash, created_at FROM users WHERE id = $1`
 
-	var u domain.User
-	err := s.pool.QueryRow(ctx, q, id).Scan(&u.ID, &u.Login, &u.PasswordHash, &u.CreatedAt)
+	rows, err := s.pool.Query(ctx, q, id)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, storage.ErrNotFound
-		}
+		return nil, fmt.Errorf("storage.FindUserByID: %w", err)
+	}
+
+	u, err := pgx.CollectOneRow(rows, pgx.RowToStructByNameLax[domain.User])
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, storage.ErrNotFound
+	}
+	if err != nil {
 		return nil, fmt.Errorf("storage.FindUserByID: %w", err)
 	}
 
@@ -107,12 +115,16 @@ func (s *Storage) CreateAd(ctx context.Context, ad *domain.Ad) (int64, error) {
 func (s *Storage) FindAdByID(ctx context.Context, id int64) (*domain.Ad, error) {
 	q := `SELECT id, user_id, title, text, image_url, price, created_at FROM ads WHERE id = $1`
 
-	var ad domain.Ad
-	err := s.pool.QueryRow(ctx, q, id).Scan(&ad.ID, &ad.UserID, &ad.Title, &ad.Text, &ad.ImageURL, &ad.Price, &ad.CreatedAt)
+	rows, err := s.pool.Query(ctx, q, id)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, storage.ErrNotFound
-		}
+		return nil, fmt.Errorf("storage.FindAdByID: %w", err)
+	}
+
+	ad, err := pgx.CollectOneRow(rows, pgx.RowToStructByNameLax[domain.Ad])
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, storage.ErrNotFound
+	}
+	if err != nil {
 		return nil, fmt.Errorf("storage.FindAdByID: %w", err)
 	}
 
@@ -121,33 +133,29 @@ func (s *Storage) FindAdByID(ctx context.Context, id int64) (*domain.Ad, error) 
 
 // ListAds returns a list of ads, sorted by the given column and order.
 func (s *Storage) ListAds(ctx context.Context, sortBy, order string) ([]domain.Ad, error) {
-	// Whitelist sortable columns and order to prevent SQL injection
-	if sortBy != "price" && sortBy != "created_at" {
-		sortBy = "created_at" // default sort
-	}
-	if order != "asc" && order != "desc" {
-		order = "desc" // default order
+	// валидация sortBy / order как у вас
+
+	switch sortBy {
+	case "price", "created_at":
+	default:
+		sortBy = "created_at"
 	}
 
-	q := fmt.Sprintf(`SELECT id, user_id, title, text, image_url, price, created_at FROM ads ORDER BY %s %s`, sortBy, order)
+	if order != "asc" {
+		order = "desc"
+	}
+
+	q := fmt.Sprintf(`SELECT id, user_id, title, text, image_url, price, created_at
+	                  FROM ads ORDER BY %s %s`, sortBy, order)
 
 	rows, err := s.pool.Query(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("storage.ListAds: %w", err)
 	}
-	defer rows.Close()
 
-	var ads []domain.Ad
-	for rows.Next() {
-		var ad domain.Ad
-		if err := rows.Scan(&ad.ID, &ad.UserID, &ad.Title, &ad.Text, &ad.ImageURL, &ad.Price, &ad.CreatedAt); err != nil {
-			return nil, fmt.Errorf("storage.ListAds: scan error: %w", err)
-		}
-		ads = append(ads, ad)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("storage.ListAds: rows error: %w", err)
+	ads, err := pgx.CollectRows(rows, pgx.RowToStructByNameLax[domain.Ad])
+	if err != nil {
+		return nil, fmt.Errorf("storage.ListAds: %w", err)
 	}
 
 	return ads, nil
