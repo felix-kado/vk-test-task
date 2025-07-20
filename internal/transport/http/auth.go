@@ -54,6 +54,18 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate login
+	if err := ValidateLogin(req.Login); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Validate password
+	if err := ValidatePassword(req.Password); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	_, user, err := h.service.Register(r.Context(), req.Login, req.Password)
 	if err != nil {
 		if errors.Is(err, storage.ErrExists) {
@@ -97,10 +109,26 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate login format
+	if err := ValidateLogin(req.Login); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Check password is not empty
+	if req.Password == "" {
+		http.Error(w, "password is required", http.StatusBadRequest)
+		return
+	}
+
 	token, err := h.service.Login(r.Context(), req.Login, req.Password)
 	if err != nil {
-		// This should be more granular based on service errors
-		http.Error(w, "invalid credentials", http.StatusUnauthorized)
+		if errors.Is(err, storage.ErrNotFound) || errors.Is(err, storage.ErrInvalidCredentials) {
+			http.Error(w, "invalid credentials", http.StatusUnauthorized)
+			return
+		}
+		h.log.Error("failed to login", slog.String("error", err.Error()))
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 

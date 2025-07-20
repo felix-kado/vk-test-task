@@ -31,10 +31,10 @@ func NewAdsHandler(service AdsService, log *slog.Logger) *AdsHandler {
 
 // AdRequest defines the structure for an ad creation request.
 type AdRequest struct {
-	Title    string  `json:"title"`
-	Text     string  `json:"text"`
-	ImageURL string  `json:"image_url,omitempty"`
-	Price    int64 `json:"price,omitempty"`
+	Title    string `json:"title"`
+	Text     string `json:"text"`
+	ImageURL string `json:"image_url,omitempty"`
+	Price    int64  `json:"price,omitempty"`
 }
 
 // CreateAd godoc
@@ -64,6 +64,13 @@ func (h *AdsHandler) CreateAd(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
+
+	// Validate ad request
+	if err := ValidateAdRequest(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	ad := &domain.Ad{
 		UserID:   userID,
 		Title:    req.Title,
@@ -113,6 +120,12 @@ func (h *AdsHandler) ListAds(w http.ResponseWriter, r *http.Request) {
 		order = "desc" // default
 	}
 
+	// Validate query parameters
+	if err := ValidateListParams(sortBy, order); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	ads, err := h.service.ListAds(r.Context(), sortBy, order)
 	if err != nil {
 		h.log.Error("failed to list ads", slog.String("error", err.Error()))
@@ -124,4 +137,27 @@ func (h *AdsHandler) ListAds(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(ads); err != nil {
 		h.log.Error("failed to encode response", slog.String("error", err.Error()))
 	}
+}
+
+func ValidateAdRequest(req *AdRequest) error {
+	if req.Title == "" {
+		return errors.New("title is required")
+	}
+	if req.Text == "" {
+		return errors.New("text is required")
+	}
+	if req.Price < 0 {
+		return errors.New("price must be non-negative")
+	}
+	return nil
+}
+
+func ValidateListParams(sortBy, order string) error {
+	if sortBy != "price" && sortBy != "created_at" {
+		return errors.New("invalid sort_by parameter")
+	}
+	if order != "asc" && order != "desc" {
+		return errors.New("invalid order parameter")
+	}
+	return nil
 }
