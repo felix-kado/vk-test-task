@@ -8,6 +8,7 @@ import (
 
 	"example.com/market/internal/domain"
 	"example.com/market/internal/storage"
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -45,10 +46,10 @@ func (s *Storage) CreateUser(ctx context.Context, u *domain.User) error {
 	err := s.pool.QueryRow(ctx, q, u.Login, u.PasswordHash).Scan(&u.ID, &u.CreatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 			return storage.ErrExists
 		}
-		return err
+		return fmt.Errorf("storage.CreateUser: %w", err)
 	}
 
 	return nil
@@ -93,7 +94,7 @@ func (s *Storage) CreateAd(ctx context.Context, ad *domain.Ad) (int64, error) {
 	err := s.pool.QueryRow(ctx, q, ad.UserID, ad.Title, ad.Text, ad.ImageURL, ad.Price).Scan(&ad.ID, &ad.CreatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23503" { // foreign key violation on users table
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.ForeignKeyViolation {
 			return 0, storage.ErrNotFound
 		}
 		return 0, fmt.Errorf("storage.CreateAd: %w", err)
