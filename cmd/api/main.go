@@ -9,14 +9,13 @@ import (
 	"syscall"
 	"time"
 
-	"example.com/market/internal/config"
 	_ "example.com/market/docs"
-	_ "example.com/market/internal/domain"
+	"example.com/market/internal/config"
+	handlers "example.com/market/internal/handlers"
 	"example.com/market/internal/logger"
 	"example.com/market/internal/services/ads"
 	"example.com/market/internal/services/auth"
 	"example.com/market/internal/storage/postgres"
-	httptransport "example.com/market/internal/transport/http"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
@@ -50,11 +49,11 @@ func main() {
 	adsService := ads.New(db)
 
 	// 5. Init transport (router, handlers)
-	authHandler := httptransport.NewAuthHandler(authService, log)
-	adsHandler := httptransport.NewAdsHandler(adsService, log)
+	authHandler := handlers.NewAuthHandler(authService, log)
+	adsHandler := handlers.NewAdsHandler(adsService, log)
 
 	// Init router
-	router := httptransport.NewRouter(log, authHandler, adsHandler, authService)
+	router := handlers.NewRouter(log, authHandler, adsHandler, authService)
 	router.Get("/swagger/*", httpSwagger.WrapHandler)
 
 	// 6. Graceful shutdown
