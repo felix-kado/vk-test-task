@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"example.com/market/internal/domain"
+	"example.com/market/internal/services"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,7 +26,10 @@ func (m *mockAdRepository) FindAdByID(ctx context.Context, id int64) (*domain.Ad
 }
 
 func (m *mockAdRepository) ListAds(ctx context.Context, sortBy, order string) ([]domain.Ad, error) {
-	return m.ListAdsFunc(ctx, sortBy, order)
+	if m.ListAdsFunc != nil {
+		return m.ListAdsFunc(ctx, sortBy, order)
+	}
+	return nil, nil
 }
 
 func TestService_CreateAd(t *testing.T) {
@@ -52,14 +56,28 @@ func TestService_CreateAd(t *testing.T) {
 			ad: &domain.Ad{Title: string(make([]byte, 121)), Text: "Some text", UserID: 1},
 			mockRepo: &mockAdRepository{},
 			expectedID:  0,
-			expectedErr: ErrValidation,
+			expectedErr: services.ErrInvalidInput,
 		},
 		{
 			name: "Validation Error - Empty text",
 			ad: &domain.Ad{Title: "New Ad", Text: "", UserID: 1},
 			mockRepo: &mockAdRepository{},
 			expectedID:  0,
-			expectedErr: ErrValidation,
+			expectedErr: services.ErrInvalidInput,
+		},
+		{
+			name: "Validation Error - Missing title",
+			ad: &domain.Ad{Title: "", Text: "Some text", UserID: 1, Price: 100},
+			mockRepo: &mockAdRepository{},
+			expectedID:  0,
+			expectedErr: services.ErrInvalidInput,
+		},
+		{
+			name: "Validation Error - Negative price",
+			ad: &domain.Ad{Title: "New Ad", Text: "Some text", UserID: 1, Price: -100},
+			mockRepo: &mockAdRepository{},
+			expectedID:  0,
+			expectedErr: services.ErrInvalidInput,
 		},
 		{
 			name: "Repository Error",
@@ -82,10 +100,61 @@ func TestService_CreateAd(t *testing.T) {
 			assert.Equal(t, tt.expectedID, id)
 			if tt.expectedErr != nil {
 				assert.Error(t, err)
-				// Use errors.Is for wrapped errors
-				if !errors.Is(err, tt.expectedErr) && err.Error() != tt.expectedErr.Error() {
-					t.Errorf("expected error '%v', got '%v'", tt.expectedErr, err)
+				if errors.Is(err, services.ErrInvalidInput) {
+					assert.ErrorIs(t, err, tt.expectedErr)
+				} else {
+					assert.ErrorContains(t, err, tt.expectedErr.Error())
 				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestService_ListAds(t *testing.T) {
+	tests := []struct {
+		name        string
+		sortBy      string
+		order       string
+		mockRepo    *mockAdRepository
+		expectedErr error
+	}{
+		{
+			name:   "Success",
+			sortBy: "price",
+			order:  "asc",
+			mockRepo: &mockAdRepository{
+				ListAdsFunc: func(ctx context.Context, sortBy, order string) ([]domain.Ad, error) {
+					return []domain.Ad{}, nil
+				},
+			},
+			expectedErr: nil,
+		},
+		{
+			name:        "Invalid sort_by",
+			sortBy:      "name",
+			order:       "asc",
+			mockRepo:    &mockAdRepository{},
+			expectedErr: services.ErrInvalidInput,
+		},
+		{
+			name:        "Invalid order",
+			sortBy:      "price",
+			order:       "descending",
+			mockRepo:    &mockAdRepository{},
+			expectedErr: services.ErrInvalidInput,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := New(tt.mockRepo)
+			_, err := service.ListAds(context.Background(), tt.sortBy, tt.order)
+
+			if tt.expectedErr != nil {
+				assert.Error(t, err)
+				assert.True(t, errors.Is(err, tt.expectedErr), "expected error '%v', got '%v'", tt.expectedErr, err)
 			} else {
 				assert.NoError(t, err)
 			}

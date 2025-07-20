@@ -47,7 +47,7 @@ func (s *Storage) CreateUser(ctx context.Context, u *domain.User) error {
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
-			return storage.ErrExists
+			return storage.ErrUserExists
 		}
 		return fmt.Errorf("storage.CreateUser: %w", err)
 	}
@@ -65,10 +65,10 @@ func (s *Storage) FindByLogin(ctx context.Context, login string) (*domain.User, 
 	}
 
 	u, err := pgx.CollectOneRow(rows, pgx.RowToStructByNameLax[domain.User])
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, storage.ErrNotFound
-	}
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, storage.ErrUserNotFound
+		}
 		return nil, fmt.Errorf("storage.FindByLogin: %w", err)
 	}
 
@@ -86,7 +86,7 @@ func (s *Storage) FindUserByID(ctx context.Context, id int64) (*domain.User, err
 
 	u, err := pgx.CollectOneRow(rows, pgx.RowToStructByNameLax[domain.User])
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, storage.ErrNotFound
+		return nil, storage.ErrUserNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("storage.FindUserByID: %w", err)
@@ -103,7 +103,7 @@ func (s *Storage) CreateAd(ctx context.Context, ad *domain.Ad) (int64, error) {
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.ForeignKeyViolation {
-			return 0, storage.ErrNotFound
+			return 0, storage.ErrInvalidUserReference
 		}
 		return 0, fmt.Errorf("storage.CreateAd: %w", err)
 	}
@@ -122,7 +122,7 @@ func (s *Storage) FindAdByID(ctx context.Context, id int64) (*domain.Ad, error) 
 
 	ad, err := pgx.CollectOneRow(rows, pgx.RowToStructByNameLax[domain.Ad])
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, storage.ErrNotFound
+		return nil, storage.ErrAdNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("storage.FindAdByID: %w", err)
@@ -133,7 +133,7 @@ func (s *Storage) FindAdByID(ctx context.Context, id int64) (*domain.Ad, error) 
 
 // ListAds returns a list of ads, sorted by the given column and order.
 func (s *Storage) ListAds(ctx context.Context, sortBy, order string) ([]domain.Ad, error) {
-	// валидация sortBy / order как у вас
+	// валидация sortBy / order
 
 	switch sortBy {
 	case "price", "created_at":

@@ -9,7 +9,7 @@ import (
 
 	"example.com/market/internal/domain"
 	"example.com/market/internal/middleware"
-	"example.com/market/internal/storage"
+	"example.com/market/internal/services"
 )
 
 // AdsService defines the interface for ad-related operations.
@@ -54,20 +54,14 @@ type AdRequest struct {
 func (h *AdsHandler) CreateAd(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int64)
 	if !ok {
-		h.log.Error("failed to get user ID from context")
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		h.log.Error("unauthorized: missing user ID in context")
+		respondWithError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
 	var req AdRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	// Validate ad request
-	if err := ValidateAdRequest(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
@@ -81,12 +75,16 @@ func (h *AdsHandler) CreateAd(w http.ResponseWriter, r *http.Request) {
 
 	adID, err := h.service.CreateAd(r.Context(), ad)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			http.Error(w, "user not found", http.StatusBadRequest)
+		if errors.Is(err, services.ErrInvalidInput) {
+			respondWithError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if errors.Is(err, services.ErrForbidden) {
+			respondWithError(w, http.StatusForbidden, "you do not have permission to perform this action")
 			return
 		}
 		h.log.Error("failed to create ad", slog.String("error", err.Error()))
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "could not create ad")
 		return
 	}
 
@@ -120,16 +118,14 @@ func (h *AdsHandler) ListAds(w http.ResponseWriter, r *http.Request) {
 		order = "desc" // default
 	}
 
-	// Validate query parameters
-	if err := ValidateListParams(sortBy, order); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
 	ads, err := h.service.ListAds(r.Context(), sortBy, order)
 	if err != nil {
+		if errors.Is(err, services.ErrInvalidInput) {
+			respondWithError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 		h.log.Error("failed to list ads", slog.String("error", err.Error()))
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "could not retrieve ads")
 		return
 	}
 
@@ -139,25 +135,3 @@ func (h *AdsHandler) ListAds(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func ValidateAdRequest(req *AdRequest) error {
-	if req.Title == "" {
-		return errors.New("title is required")
-	}
-	if req.Text == "" {
-		return errors.New("text is required")
-	}
-	if req.Price < 0 {
-		return errors.New("price must be non-negative")
-	}
-	return nil
-}
-
-func ValidateListParams(sortBy, order string) error {
-	if sortBy != "price" && sortBy != "created_at" {
-		return errors.New("invalid sort_by parameter")
-	}
-	if order != "asc" && order != "desc" {
-		return errors.New("invalid order parameter")
-	}
-	return nil
-}

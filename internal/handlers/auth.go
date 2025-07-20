@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"example.com/market/internal/domain"
-	"example.com/market/internal/storage"
+	"example.com/market/internal/services"
 )
 
 // AuthService defines the interface for authentication-related operations.
@@ -50,30 +50,23 @@ type RegistrationRequest struct {
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req RegistrationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	// Validate login
-	if err := ValidateLogin(req.Login); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Validate password
-	if err := ValidatePassword(req.Password); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
 	_, user, err := h.service.Register(r.Context(), req.Login, req.Password)
 	if err != nil {
-		if errors.Is(err, storage.ErrExists) {
-			http.Error(w, "user already exists", http.StatusConflict)
+		if errors.Is(err, services.ErrInvalidInput) {
+			respondWithError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if errors.Is(err, services.ErrUserExists) {
+			h.log.Info("user already exists", slog.String("login", req.Login))
+			respondWithError(w, http.StatusConflict, "user with this login already exists")
 			return
 		}
 		h.log.Error("failed to register user", slog.String("error", err.Error()))
-		http.Error(w, "failed to register user", http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "could not register user")
 		return
 	}
 
@@ -105,30 +98,22 @@ type LoginRequest struct {
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	// Validate login format
-	if err := ValidateLogin(req.Login); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Check password is not empty
-	if req.Password == "" {
-		http.Error(w, "password is required", http.StatusBadRequest)
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
 	token, err := h.service.Login(r.Context(), req.Login, req.Password)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) || errors.Is(err, storage.ErrInvalidCredentials) {
-			http.Error(w, "invalid credentials", http.StatusUnauthorized)
+		if errors.Is(err, services.ErrInvalidInput) {
+			respondWithError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if errors.Is(err, services.ErrInvalidCredentials) {
+			respondWithError(w, http.StatusUnauthorized, "invalid login or password")
 			return
 		}
 		h.log.Error("failed to login", slog.String("error", err.Error()))
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "an internal error occurred")
 		return
 	}
 

@@ -4,15 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"example.com/market/internal/domain"
-	"example.com/market/internal/storage"
+	"example.com/market/internal/services"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // mockAuthService is a mock implementation of AuthService for testing.
@@ -30,6 +30,10 @@ func (m *mockAuthService) Login(ctx context.Context, login, password string) (st
 }
 
 func TestAuthHandler_Register(t *testing.T) {
+	type errorResponse struct {
+		Error string `json:"error"`
+	}
+
 	tests := []struct {
 		name           string
 		request        map[string]string
@@ -52,44 +56,18 @@ func TestAuthHandler_Register(t *testing.T) {
 			expectedBody:   `{"user_id":1}`,
 		},
 		{
-			name: "invalid login format - too short",
+			name: "validation error from service",
 			request: map[string]string{
-				"login":    "ab",
-				"password": "ValidPass123!",
-			},
-			setupMock:      func(m *mockAuthService) {},
-			expectedStatus: http.StatusBadRequest,
-			expectedBody:   `login must be 3-50 characters long, start with a letter, and contain only letters, numbers, and underscores`,
-		},
-		{
-			name: "invalid login format - invalid characters",
-			request: map[string]string{
-				"login":    "test@user",
-				"password": "ValidPass123!",
-			},
-			setupMock:      func(m *mockAuthService) {},
-			expectedStatus: http.StatusBadRequest,
-			expectedBody:   `login must be 3-50 characters long, start with a letter, and contain only letters, numbers, and underscores`,
-		},
-		{
-			name: "invalid password - too short",
-			request: map[string]string{
-				"login":    "testuser",
+				"login":    "a",
 				"password": "short",
 			},
-			setupMock:      func(m *mockAuthService) {},
-			expectedStatus: http.StatusBadRequest,
-			expectedBody:   `password must be 8-72 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character`,
-		},
-		{
-			name: "invalid password - missing requirements",
-			request: map[string]string{
-				"login":    "testuser",
-				"password": "alllowercase",
+			setupMock: func(m *mockAuthService) {
+				m.RegisterFunc = func(ctx context.Context, login, password string) (string, *domain.User, error) {
+					return "", nil, fmt.Errorf("%w: invalid password", services.ErrInvalidInput)
+				}
 			},
-			setupMock:      func(m *mockAuthService) {},
 			expectedStatus: http.StatusBadRequest,
-			expectedBody:   `password must be 8-72 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character`,
+			expectedBody:   "invalid input: invalid password",
 		},
 		{
 			name: "user already exists",
@@ -99,11 +77,11 @@ func TestAuthHandler_Register(t *testing.T) {
 			},
 			setupMock: func(m *mockAuthService) {
 				m.RegisterFunc = func(ctx context.Context, login, password string) (string, *domain.User, error) {
-					return "", nil, storage.ErrExists
+					return "", nil, services.ErrUserExists
 				}
 			},
 			expectedStatus: http.StatusConflict,
-			expectedBody:   `user already exists`,
+			expectedBody:   "user with this login already exists",
 		},
 	}
 
@@ -122,12 +100,25 @@ func TestAuthHandler_Register(t *testing.T) {
 			handler.Register(rr, req)
 
 			assert.Equal(t, tt.expectedStatus, rr.Code)
-			assert.Contains(t, rr.Body.String(), tt.expectedBody)
+
+			if rr.Code >= 400 {
+				assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+				var errResp errorResponse
+				err := json.Unmarshal(rr.Body.Bytes(), &errResp)
+				assert.NoError(t, err, "failed to unmarshal error response")
+				assert.Equal(t, tt.expectedBody, errResp.Error)
+			} else {
+				assert.JSONEq(t, tt.expectedBody, rr.Body.String())
+			}
 		})
 	}
 }
 
 func TestAuthHandler_Login(t *testing.T) {
+	type errorResponse struct {
+		Error string `json:"error"`
+	}
+
 	tests := []struct {
 		name           string
 		request        map[string]string
@@ -150,24 +141,18 @@ func TestAuthHandler_Login(t *testing.T) {
 			expectedBody:   `{"token":"token"}`,
 		},
 		{
-			name: "invalid login format",
+			name: "validation error from service",
 			request: map[string]string{
-				"login":    "ab",
+				"login":    "a",
 				"password": "ValidPass123!",
 			},
-			setupMock:      func(m *mockAuthService) {},
-			expectedStatus: http.StatusBadRequest,
-			expectedBody:   `login must be 3-50 characters long, start with a letter, and contain only letters, numbers, and underscores`,
-		},
-		{
-			name: "missing password",
-			request: map[string]string{
-				"login":    "testuser",
-				"password": "",
+			setupMock: func(m *mockAuthService) {
+				m.LoginFunc = func(ctx context.Context, login, password string) (string, error) {
+					return "", fmt.Errorf("%w: invalid login", services.ErrInvalidInput)
+				}
 			},
-			setupMock:      func(m *mockAuthService) {},
 			expectedStatus: http.StatusBadRequest,
-			expectedBody:   `password is required`,
+			expectedBody:   "invalid input: invalid login",
 		},
 		{
 			name: "invalid credentials",
@@ -177,11 +162,11 @@ func TestAuthHandler_Login(t *testing.T) {
 			},
 			setupMock: func(m *mockAuthService) {
 				m.LoginFunc = func(ctx context.Context, login, password string) (string, error) {
-					return "", storage.ErrInvalidCredentials
+					return "", services.ErrInvalidCredentials
 				}
 			},
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `invalid credentials`,
+			expectedBody:   "invalid login or password",
 		},
 	}
 
@@ -200,92 +185,15 @@ func TestAuthHandler_Login(t *testing.T) {
 			handler.Login(rr, req)
 
 			assert.Equal(t, tt.expectedStatus, rr.Code)
-			if tt.expectedStatus == http.StatusOK {
+
+			if rr.Code >= 400 {
+				assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+				var errResp errorResponse
+				err := json.Unmarshal(rr.Body.Bytes(), &errResp)
+				assert.NoError(t, err, "failed to unmarshal error response")
+				assert.Equal(t, tt.expectedBody, errResp.Error)
+			} else {
 				assert.JSONEq(t, tt.expectedBody, rr.Body.String())
-			} else {
-				assert.Contains(t, rr.Body.String(), tt.expectedBody)
-			}
-		})
-	}
-}
-
-func TestValidation(t *testing.T) {
-	tests := []struct {
-		name    string
-		login   string
-		wantErr bool
-		errMsg  string
-	}{
-		{
-			name:    "valid login",
-			login:   "user123",
-			wantErr: false,
-		},
-		{
-			name:    "login too short",
-			login:   "ab",
-			wantErr: true,
-			errMsg:  "login must be 3-50 characters long, start with a letter, and contain only letters, numbers, and underscores",
-		},
-		{
-			name:    "login with special chars",
-			login:   "user@test",
-			wantErr: true,
-			errMsg:  "login must be 3-50 characters long, start with a letter, and contain only letters, numbers, and underscores",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateLogin(tt.login)
-			if tt.wantErr {
-				require.Error(t, err)
-				assert.Equal(t, tt.errMsg, err.Error())
-			} else {
-				require.NoError(t, err)
-			}
-		})
-	}
-
-	passwordTests := []struct {
-		name    string
-		pass    string
-		wantErr bool
-		errMsg  string
-	}{
-		{
-			name:    "valid password",
-			pass:    "ValidPass123!",
-			wantErr: false,
-		},
-		{
-			name:    "password too short",
-			pass:    "Short1!",
-			wantErr: true,
-			errMsg:  "password must be 8-72 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character",
-		},
-		{
-			name:    "missing uppercase",
-			pass:    "nopass123!",
-			wantErr: true,
-			errMsg:  "password must be 8-72 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character",
-		},
-		{
-			name:    "missing special char",
-			pass:    "NoSpecial123",
-			wantErr: true,
-			errMsg:  "password must be 8-72 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character",
-		},
-	}
-
-	for _, tt := range passwordTests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidatePassword(tt.pass)
-			if tt.wantErr {
-				require.Error(t, err)
-				assert.Equal(t, tt.errMsg, err.Error())
-			} else {
-				require.NoError(t, err)
 			}
 		})
 	}

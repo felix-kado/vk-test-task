@@ -2,11 +2,20 @@ package storage
 
 import "errors"
 
+// Repository layer errors - specific to storage operations
 var (
-	// ErrExists is returned when a resource already exists.
-	ErrExists = errors.New("already exists")
-	// ErrNotFound is returned when a resource is not found.
-	ErrNotFound = errors.New("not found")
-	// ErrInvalidCredentials is returned when provided credentials are invalid.
+	// User-related errors
+	ErrUserNotFound       = errors.New("user not found")
+	ErrUserExists         = errors.New("user already exists")
 	ErrInvalidCredentials = errors.New("invalid credentials")
+	
+	// Ad-related errors
+	ErrAdNotFound = errors.New("ad not found")
+	
+	// Relationship errors
+	ErrInvalidUserReference = errors.New("invalid user reference")
+	
+	// Generic storage errors
+	ErrDuplicateEntry = errors.New("duplicate entry")
+	ErrConstraintViolation = errors.New("constraint violation")
 )

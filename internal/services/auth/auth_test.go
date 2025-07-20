@@ -3,12 +3,15 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"example.com/market/internal/domain"
+	"example.com/market/internal/services"
 	"example.com/market/internal/storage"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -32,34 +35,82 @@ func (m *mockUserRepository) FindUserByID(ctx context.Context, id int64) (*domai
 }
 
 func TestService_Register(t *testing.T) {
-	mockRepo := &mockUserRepository{
-		CreateUserFunc: func(ctx context.Context, u *domain.User) error {
-			u.ID = 1 // Simulate DB assigning an ID
-			return nil
-		},
+	t.Run("successful registration", func(t *testing.T) {
+		mockRepo := &mockUserRepository{
+			CreateUserFunc: func(ctx context.Context, u *domain.User) error {
+				u.ID = 1 // Simulate DB assigning an ID
+				return nil
+			},
+		}
+
+		service := New(mockRepo, "test-secret", time.Hour)
+
+		token, user, err := service.Register(context.Background(), "newuser", "ValidPass123!")
+
+		assert.NoError(t, err)
+		assert.NotEmpty(t, token)
+		require.NotNil(t, user)
+		assert.Equal(t, int64(1), user.ID)
+		assert.Equal(t, "newuser", user.Login)
+	})
+
+	t.Run("user already exists", func(t *testing.T) {
+		mockRepo := &mockUserRepository{
+			CreateUserFunc: func(ctx context.Context, u *domain.User) error {
+				return storage.ErrUserExists
+			},
+		}
+
+		service := New(mockRepo, "test-secret", time.Hour)
+
+		_, _, err := service.Register(context.Background(), "existinguser", "ValidPass123!")
+
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, services.ErrUserExists))
+	})
+}
+
+func TestService_Register_Validation(t *testing.T) {
+	tests := []struct {
+		name     string
+		login    string
+		password string
+		wantErr  string
+	}{
+		{"invalid login too short", "a", "ValidPass123!", ErrInvalidLogin.Error()},
+		{"invalid login starts with number", "1user", "ValidPass123!", ErrInvalidLogin.Error()},
+		{"invalid login with special chars", "user!", "ValidPass123!", ErrInvalidLogin.Error()},
+		{"invalid password too short", "newuser", "short", ErrInvalidPassword.Error()},
+		{"invalid password no uppercase", "newuser", "validpass123!", ErrInvalidPassword.Error()},
+		{"invalid password no lowercase", "newuser", "VALIDPASS123!", ErrInvalidPassword.Error()},
+		{"invalid password no number", "newuser", "ValidPass!", ErrInvalidPassword.Error()},
+		{"invalid password no special char", "newuser", "ValidPass123", ErrInvalidPassword.Error()},
 	}
 
-	service := New(mockRepo, "test-secret", time.Hour)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := &mockUserRepository{}
+			service := New(mockRepo, "test-secret", time.Hour)
 
-	token, user, err := service.Register(context.Background(), "newuser", "password123")
+			_, _, err := service.Register(context.Background(), tt.login, tt.password)
 
-	assert.NoError(t, err)
-	assert.NotEmpty(t, token)
-	assert.NotNil(t, user)
-	assert.Equal(t, int64(1), user.ID)
-	assert.Equal(t, "newuser", user.Login)
+			require.Error(t, err)
+			assert.True(t, errors.Is(err, services.ErrInvalidInput))
+			assert.ErrorContains(t, err, tt.wantErr)
+		})
+	}
 }
 
 func TestService_Login(t *testing.T) {
-	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("ValidPass123!"), bcrypt.DefaultCost)
 
 	tests := []struct {
-		name          string
-		mockRepo      *mockUserRepository
-		login         string
-		password      string
-		expectToken   bool
-		expectedErr   error
+		name        string
+		mockRepo    *mockUserRepository
+		login       string
+		password    string
+		expectToken bool
+		expectedErr error
 	}{
 		{
 			name: "Success",
@@ -69,7 +120,7 @@ func TestService_Login(t *testing.T) {
 				},
 			},
 			login:       "testuser",
-			password:    "password123",
+			password:    "ValidPass123!",
 			expectToken: true,
 			expectedErr: nil,
 		},
@@ -77,13 +128,13 @@ func TestService_Login(t *testing.T) {
 			name: "User not found",
 			mockRepo: &mockUserRepository{
 				FindByLoginFunc: func(ctx context.Context, login string) (*domain.User, error) {
-					return nil, storage.ErrNotFound
+					return nil, storage.ErrUserNotFound
 				},
 			},
 			login:       "nonexistent",
-			password:    "password123",
+			password:    "ValidPass123!",
 			expectToken: false,
-			expectedErr: ErrInvalidCredentials,
+			expectedErr: services.ErrInvalidCredentials,
 		},
 		{
 			name: "Invalid password",
@@ -95,7 +146,7 @@ func TestService_Login(t *testing.T) {
 			login:       "testuser",
 			password:    "wrongpassword",
 			expectToken: false,
-			expectedErr: ErrInvalidCredentials,
+			expectedErr: services.ErrInvalidCredentials,
 		},
 	}
 
@@ -109,9 +160,34 @@ func TestService_Login(t *testing.T) {
 				assert.NoError(t, err)
 			} else {
 				assert.Empty(t, token)
-				assert.Error(t, err)
-				assert.True(t, errors.Is(err, tt.expectedErr))
+				require.Error(t, err)
+				assert.True(t, errors.Is(err, tt.expectedErr), fmt.Sprintf("expected error %v, got %v", tt.expectedErr, err))
 			}
+		})
+	}
+}
+
+func TestService_Login_Validation(t *testing.T) {
+	tests := []struct {
+		name     string
+		login    string
+		password string
+		wantErr  string
+	}{
+		{"invalid login", "a", "ValidPass123!", ErrInvalidLogin.Error()},
+		{"empty password", "testuser", "", "password is required"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := &mockUserRepository{}
+			service := New(mockRepo, "test-secret", time.Hour)
+
+			_, err := service.Login(context.Background(), tt.login, tt.password)
+
+			require.Error(t, err)
+			assert.True(t, errors.Is(err, services.ErrInvalidInput))
+			assert.ErrorContains(t, err, tt.wantErr)
 		})
 	}
 }
