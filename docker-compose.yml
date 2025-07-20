@@ -25,7 +25,7 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ./migrations:/migrations
+      - ./internal/storage/postgres/migrations:/migrations
     command: [
         '-path=/migrations',
         '-database',
