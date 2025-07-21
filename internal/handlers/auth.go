@@ -74,7 +74,9 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	resp := dto.ToUserResponse(user)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.log.Error("failed to encode JSON response", slog.String("error", err.Error()))
+	}
 }
 
 // LoginRequest defines the structure for a user login request.
@@ -120,5 +122,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	resp := map[string]string{"token": token}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.log.Error("failed to encode JSON response", slog.String("error", err.Error()))
+	}
 }

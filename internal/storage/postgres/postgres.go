@@ -116,7 +116,6 @@ func (s *Storage) CreateAd(ctx context.Context, ad *domain.Ad) (int64, error) {
 	return ad.ID, nil
 }
 
-
 // ListAds returns a list of ads with pagination and filtering.
 func (s *Storage) ListAds(ctx context.Context, params *domain.ListAdsParams) ([]domain.Ad, error) {
 	if params == nil {
@@ -145,7 +144,7 @@ func (s *Storage) ListAds(ctx context.Context, params *domain.ListAdsParams) ([]
 
 	// Add WHERE clause if there are conditions
 	if len(whereConditions) > 0 {
-		q += " WHERE " + fmt.Sprintf("(%s)", fmt.Sprintf("%s", whereConditions[0]))
+		q += " WHERE " + fmt.Sprintf("(%s)", whereConditions[0])
 		for i := 1; i < len(whereConditions); i++ {
 			q += " AND " + whereConditions[i]
 		}

@@ -33,8 +33,6 @@ func (m *mockAdsService) ListAds(ctx context.Context, params *domain.ListAdsPara
 	return nil, nil
 }
 
-
-
 func TestAdsHandler_CreateAd(t *testing.T) {
 	type errorResponse struct {
 		Error string `json:"error"`
@@ -49,7 +47,7 @@ func TestAdsHandler_CreateAd(t *testing.T) {
 		expectedBody   string
 	}{
 		{
-			name: "successful ad creation",
+			name:   "successful ad creation",
 			userID: 1,
 			requestBody: AdRequest{
 				Title: "Test Ad",
@@ -119,10 +117,6 @@ func TestAdsHandler_CreateAd(t *testing.T) {
 }
 
 func TestAdsHandler_ListAds(t *testing.T) {
-	type errorResponse struct {
-		Error string `json:"error"`
-	}
-
 	tests := []struct {
 		name                 string
 		queryParams          string
@@ -191,27 +185,27 @@ func TestAdsHandler_ListAds(t *testing.T) {
 						nil
 				}
 			},
-			expectedStatus: http.StatusOK,
+			expectedStatus:       http.StatusOK,
 			expectedBodyContains: []string{"[]"},
 		},
 		{
-			name:        "Invalid page parameter",
-			queryParams: "?page=abc",
-			setupMock:   func(m *mockAdsService) {},
+			name:           "Invalid page parameter",
+			queryParams:    "?page=abc",
+			setupMock:      func(m *mockAdsService) {},
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   `{"error":"invalid page parameter: must be a number"}`,
 		},
 		{
-			name:        "Invalid limit parameter",
-			queryParams: "?limit=abc",
-			setupMock:   func(m *mockAdsService) {},
+			name:           "Invalid limit parameter",
+			queryParams:    "?limit=abc",
+			setupMock:      func(m *mockAdsService) {},
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   `{"error":"invalid limit parameter: must be a number"}`,
 		},
 		{
-			name:        "Invalid min_price parameter",
-			queryParams: "?min_price=abc",
-			setupMock:   func(m *mockAdsService) {},
+			name:           "Invalid min_price parameter",
+			queryParams:    "?min_price=abc",
+			setupMock:      func(m *mockAdsService) {},
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   `{"error":"invalid min_price parameter: must be a number"}`,
 		},

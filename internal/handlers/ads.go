@@ -112,7 +112,11 @@ func (h *AdsHandler) ListAds(w http.ResponseWriter, r *http.Request) {
 		h.log.Warn("invalid query parameters", slog.String("error", err.Error()))
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+
+		resp := map[string]string{"error": err.Error()}
+		if encErr := json.NewEncoder(w).Encode(resp); encErr != nil {
+			h.log.Error("failed to encode JSON response", slog.String("error", encErr.Error()))
+		}
 		return
 	}
 
