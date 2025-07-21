@@ -19,11 +19,14 @@ type mockAdRepository struct {
 
 // mockUserRepository is a mock implementation of UserRepository for testing.
 type mockUserRepository struct {
-	GetUserLoginsFunc func(ctx context.Context, userIDs []int64) (map[int64]string, error)
+	FindUserByIDFunc func(ctx context.Context, id int64) (*domain.User, error)
 }
 
-func (m *mockUserRepository) GetUserLogins(ctx context.Context, userIDs []int64) (map[int64]string, error) {
-	return m.GetUserLoginsFunc(ctx, userIDs)
+func (m *mockUserRepository) FindUserByID(ctx context.Context, id int64) (*domain.User, error) {
+	if m.FindUserByIDFunc != nil {
+		return m.FindUserByIDFunc(ctx, id)
+	}
+	return nil, errors.New("FindUserByIDFunc not implemented")
 }
 
 func (m *mockAdRepository) CreateAd(ctx context.Context, ad *domain.Ad) (int64, error) {
@@ -46,6 +49,7 @@ func TestService_CreateAd(t *testing.T) {
 		name          string
 		ad            *domain.Ad
 		mockRepo      *mockAdRepository
+		mockUserRepo  *mockUserRepository
 		expectedID    int64
 		expectedErr   error
 	}{
@@ -57,6 +61,11 @@ func TestService_CreateAd(t *testing.T) {
 					return 1, nil
 				},
 			},
+			mockUserRepo: &mockUserRepository{
+				FindUserByIDFunc: func(ctx context.Context, id int64) (*domain.User, error) {
+					return &domain.User{ID: 1, Login: "testuser"}, nil
+				},
+			},
 			expectedID:  1,
 			expectedErr: nil,
 		},
@@ -64,6 +73,11 @@ func TestService_CreateAd(t *testing.T) {
 			name: "Validation Error - Title too long",
 			ad: &domain.Ad{Title: string(make([]byte, 121)), Text: "Some text", UserID: 1},
 			mockRepo: &mockAdRepository{},
+			mockUserRepo: &mockUserRepository{
+				FindUserByIDFunc: func(ctx context.Context, id int64) (*domain.User, error) {
+					return &domain.User{ID: 1, Login: "testuser"}, nil
+				},
+			},
 			expectedID:  0,
 			expectedErr: services.ErrInvalidInput,
 		},
@@ -71,6 +85,11 @@ func TestService_CreateAd(t *testing.T) {
 			name: "Validation Error - Empty text",
 			ad: &domain.Ad{Title: "New Ad", Text: "", UserID: 1},
 			mockRepo: &mockAdRepository{},
+			mockUserRepo: &mockUserRepository{
+				FindUserByIDFunc: func(ctx context.Context, id int64) (*domain.User, error) {
+					return &domain.User{ID: 1, Login: "testuser"}, nil
+				},
+			},
 			expectedID:  0,
 			expectedErr: services.ErrInvalidInput,
 		},
@@ -78,6 +97,11 @@ func TestService_CreateAd(t *testing.T) {
 			name: "Validation Error - Missing title",
 			ad: &domain.Ad{Title: "", Text: "Some text", UserID: 1, Price: 100},
 			mockRepo: &mockAdRepository{},
+			mockUserRepo: &mockUserRepository{
+				FindUserByIDFunc: func(ctx context.Context, id int64) (*domain.User, error) {
+					return &domain.User{ID: 1, Login: "testuser"}, nil
+				},
+			},
 			expectedID:  0,
 			expectedErr: services.ErrInvalidInput,
 		},
@@ -85,6 +109,11 @@ func TestService_CreateAd(t *testing.T) {
 			name: "Validation Error - Negative price",
 			ad: &domain.Ad{Title: "New Ad", Text: "Some text", UserID: 1, Price: -100},
 			mockRepo: &mockAdRepository{},
+			mockUserRepo: &mockUserRepository{
+				FindUserByIDFunc: func(ctx context.Context, id int64) (*domain.User, error) {
+					return &domain.User{ID: 1, Login: "testuser"}, nil
+				},
+			},
 			expectedID:  0,
 			expectedErr: services.ErrInvalidInput,
 		},
@@ -96,6 +125,11 @@ func TestService_CreateAd(t *testing.T) {
 					return 0, errors.New("db error")
 				},
 			},
+			mockUserRepo: &mockUserRepository{
+				FindUserByIDFunc: func(ctx context.Context, id int64) (*domain.User, error) {
+					return &domain.User{ID: 1, Login: "testuser"}, nil
+				},
+			},
 			expectedID:  0,
 			expectedErr: errors.New("db error"),
 		},
@@ -103,7 +137,7 @@ func TestService_CreateAd(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			service := New(tt.mockRepo, &mockUserRepository{})
+			service := New(tt.mockRepo, tt.mockUserRepo)
 			id, err := service.CreateAd(context.Background(), tt.ad)
 
 			assert.Equal(t, tt.expectedID, id)
@@ -139,11 +173,7 @@ func TestService_ListAds(t *testing.T) {
 					return []domain.Ad{}, nil
 				},
 			},
-			mockUserRepo: &mockUserRepository{
-				GetUserLoginsFunc: func(ctx context.Context, userIDs []int64) (map[int64]string, error) {
-					return map[int64]string{1: "testuser"}, nil
-				},
-			},
+			mockUserRepo: &mockUserRepository{},
 			expectedErr: nil,
 		},
 		{
@@ -151,6 +181,11 @@ func TestService_ListAds(t *testing.T) {
 			sortBy:      "name",
 			order:       "asc",
 			mockRepo:    &mockAdRepository{},
+			mockUserRepo: &mockUserRepository{
+				FindUserByIDFunc: func(ctx context.Context, id int64) (*domain.User, error) {
+					return &domain.User{ID: 1, Login: "testuser"}, nil
+				},
+			},
 			expectedErr: services.ErrInvalidInput,
 		},
 		{
@@ -158,6 +193,11 @@ func TestService_ListAds(t *testing.T) {
 			sortBy:      "price",
 			order:       "descending",
 			mockRepo:    &mockAdRepository{},
+			mockUserRepo: &mockUserRepository{
+				FindUserByIDFunc: func(ctx context.Context, id int64) (*domain.User, error) {
+					return &domain.User{ID: 1, Login: "testuser"}, nil
+				},
+			},
 			expectedErr: services.ErrInvalidInput,
 		},
 	}

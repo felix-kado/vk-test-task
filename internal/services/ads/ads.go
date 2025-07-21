@@ -21,7 +21,7 @@ type AdRepository interface {
 
 // UserRepository defines the interface for user-related operations needed by ads service.
 type UserRepository interface {
-
+	FindUserByID(ctx context.Context, id int64) (*domain.User, error)
 }
 
 // Service provides ad-related operations.
@@ -44,10 +44,26 @@ func (s *Service) CreateAd(ctx context.Context, ad *domain.Ad) (int64, error) {
 		return 0, fmt.Errorf("%w: %v", services.ErrInvalidInput, err)
 	}
 
+	// Fetch user to get the login for denormalization
+	user, err := s.userRepo.FindUserByID(ctx, ad.UserID)
+	if err != nil {
+		if errors.Is(err, storage.ErrUserNotFound) {
+			// This case should be handled by the foreign key constraint in the DB,
+			// but checking here provides a clearer error.
+			return 0, fmt.Errorf("%w: user not found", services.ErrInvalidInput)
+		}
+		return 0, fmt.Errorf("userRepo.FindUserByID: %w", err)
+	}
+	ad.AuthorLogin = user.Login
+
 	adID, err := s.adRepo.CreateAd(ctx, ad)
 	if err != nil {
-		if errors.Is(err, storage.ErrInvalidUserReference) {
-			return 0, services.ErrForbidden
+		if errors.Is(err, storage.ErrForeignKeyViolation) {
+			// This error is now less likely to be triggered by a missing user, but we keep it for other FK constraints.
+			return 0, fmt.Errorf("%w: invalid data reference", services.ErrInvalidInput)
+		}
+		if errors.Is(err, storage.ErrAdExists) {
+			return 0, services.ErrConflict
 		}
 		return 0, fmt.Errorf("adRepo.CreateAd: %w", err)
 	}
@@ -107,4 +123,3 @@ func (s *Service) GetAd(ctx context.Context, adID int64) (*domain.Ad, error) {
 	}
 	return ad, nil
 }
-

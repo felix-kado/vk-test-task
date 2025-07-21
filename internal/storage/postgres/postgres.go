@@ -102,8 +102,13 @@ func (s *Storage) CreateAd(ctx context.Context, ad *domain.Ad) (int64, error) {
 	err := s.pool.QueryRow(ctx, q, ad.UserID, ad.AuthorLogin, ad.Title, ad.Text, ad.ImageURL, ad.Price).Scan(&ad.ID, &ad.CreatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.ForeignKeyViolation {
-			return 0, storage.ErrInvalidUserReference
+		if errors.As(err, &pgErr) {
+			switch pgErr.Code {
+			case pgerrcode.ForeignKeyViolation:
+				return 0, storage.ErrForeignKeyViolation
+			case pgerrcode.UniqueViolation:
+				return 0, storage.ErrAdExists // Assuming a unique constraint on title or something similar
+			}
 		}
 		return 0, fmt.Errorf("storage.CreateAd: %w", err)
 	}
@@ -113,7 +118,7 @@ func (s *Storage) CreateAd(ctx context.Context, ad *domain.Ad) (int64, error) {
 
 // FindAdByID finds an ad by its ID.
 func (s *Storage) FindAdByID(ctx context.Context, id int64) (*domain.Ad, error) {
-	q := `SELECT id, user_id, title, text, image_url, price, created_at FROM ads WHERE id = $1`
+	q := `SELECT id, user_id, author_login, title, text, image_url, price, created_at FROM ads WHERE id = $1`
 
 	rows, err := s.pool.Query(ctx, q, id)
 	if err != nil {

@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,7 +10,6 @@ import (
 	"example.com/market/internal/domain"
 	"example.com/market/internal/dto"
 	"example.com/market/internal/middleware"
-	"example.com/market/internal/services"
 )
 
 // AdsService defines the interface for ad-related operations.
@@ -77,16 +75,7 @@ func (h *AdsHandler) CreateAd(w http.ResponseWriter, r *http.Request) {
 
 	adID, err := h.service.CreateAd(r.Context(), ad)
 	if err != nil {
-		if errors.Is(err, services.ErrInvalidInput) {
-			respondWithError(w, http.StatusBadRequest, err.Error())
-			return
-		}
-		if errors.Is(err, services.ErrForbidden) {
-			respondWithError(w, http.StatusForbidden, "you do not have permission to perform this action")
-			return
-		}
-		h.log.Error("failed to create ad", slog.String("error", err.Error()))
-		respondWithError(w, http.StatusInternalServerError, "could not create ad")
+		handleServiceError(w, r, h.log, err)
 		return
 	}
 
@@ -123,12 +112,7 @@ func (h *AdsHandler) ListAds(w http.ResponseWriter, r *http.Request) {
 
 	ads, err := h.service.ListAds(r.Context(), sortBy, order)
 	if err != nil {
-		if errors.Is(err, services.ErrInvalidInput) {
-			respondWithError(w, http.StatusBadRequest, err.Error())
-			return
-		}
-		h.log.Error("failed to list ads", slog.String("error", err.Error()))
-		respondWithError(w, http.StatusInternalServerError, "could not retrieve ads")
+		handleServiceError(w, r, h.log, err)
 		return
 	}
 
