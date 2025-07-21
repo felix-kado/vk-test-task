@@ -116,25 +116,6 @@ func (s *Storage) CreateAd(ctx context.Context, ad *domain.Ad) (int64, error) {
 	return ad.ID, nil
 }
 
-// FindAdByID finds an ad by its ID.
-func (s *Storage) FindAdByID(ctx context.Context, id int64) (*domain.Ad, error) {
-	q := `SELECT id, user_id, author_login, title, text, image_url, price, created_at FROM ads WHERE id = $1`
-
-	rows, err := s.pool.Query(ctx, q, id)
-	if err != nil {
-		return nil, fmt.Errorf("storage.FindAdByID: %w", err)
-	}
-
-	ad, err := pgx.CollectOneRow(rows, pgx.RowToStructByNameLax[domain.Ad])
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, storage.ErrAdNotFound
-	}
-	if err != nil {
-		return nil, fmt.Errorf("storage.FindAdByID: %w", err)
-	}
-
-	return &ad, nil
-}
 
 // ListAds returns a list of ads with pagination and filtering.
 func (s *Storage) ListAds(ctx context.Context, params *domain.ListAdsParams) ([]domain.Ad, error) {

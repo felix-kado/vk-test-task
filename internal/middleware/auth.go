@@ -15,11 +15,6 @@ type contextKey string
 // UserIDKey is the key for the user ID in the context.
 const UserIDKey contextKey = "userID"
 
-// TokenParser defines the interface for parsing a token.
-type TokenParser interface {
-	ParseToken(ctx context.Context, token string) (*domain.User, error)
-}
-
 // AuthService defines the interface for authenticating a user.
 type AuthService interface {
 	ParseToken(ctx context.Context, token string) (*domain.User, error)

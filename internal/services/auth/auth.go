@@ -16,23 +16,15 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// UserRepository defines the interface for user storage.
-// This allows us to mock the storage layer in tests.
-type UserRepository interface {
-	CreateUser(ctx context.Context, u *domain.User) error
-	FindByLogin(ctx context.Context, login string) (*domain.User, error)
-	FindUserByID(ctx context.Context, id int64) (*domain.User, error)
-}
-
 // Service provides user authentication operations.
 type Service struct {
-	userRepo UserRepository
+	userRepo storage.UserRepository
 	secret   []byte
 	tokenTTL time.Duration
 }
 
 // New creates a new auth service.
-func New(userRepo UserRepository, secret string, tokenTTL time.Duration) *Service {
+func New(userRepo storage.UserRepository, secret string, tokenTTL time.Duration) *Service {
 	return &Service{
 		userRepo: userRepo,
 		secret:   []byte(secret),

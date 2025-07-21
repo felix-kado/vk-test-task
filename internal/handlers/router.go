@@ -10,7 +10,7 @@ import (
 )
 
 // NewRouter creates a new chi router and sets up the routes and middlewares.
-func NewRouter(log *slog.Logger, authHandler *AuthHandler, adsHandler *AdsHandler, authService middleware.TokenParser) *chi.Mux {
+func NewRouter(log *slog.Logger, authHandler *AuthHandler, adsHandler *AdsHandler, authService middleware.AuthService) *chi.Mux {
 	r := chi.NewRouter()
 
 	// Base middlewares

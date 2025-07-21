@@ -10,12 +10,9 @@ import (
 	"example.com/market/internal/storage"
 )
 
-
-
 // AdRepository defines the interface for ad storage.
 type AdRepository interface {
 	CreateAd(ctx context.Context, ad *domain.Ad) (int64, error)
-	FindAdByID(ctx context.Context, id int64) (*domain.Ad, error)
 	ListAds(ctx context.Context, params *domain.ListAdsParams) ([]domain.Ad, error)
 }
 
@@ -26,7 +23,7 @@ type UserRepository interface {
 
 // Service provides ad-related operations.
 type Service struct {
-	adRepo  AdRepository
+	adRepo   AdRepository
 	userRepo UserRepository
 }
 
@@ -110,17 +107,17 @@ func (s *Service) validateListParams(params *domain.ListAdsParams) error {
 	if params == nil {
 		return errors.New("params cannot be nil")
 	}
-	
+
 	// Validate sort_by if specified
 	if params.SortBy != "" && params.SortBy != "price" && params.SortBy != "created_at" {
 		return errors.New("invalid sort_by parameter: must be 'price' or 'created_at'")
 	}
-	
+
 	// Validate order if specified
 	if params.Order != "" && params.Order != "asc" && params.Order != "desc" {
 		return errors.New("invalid order parameter: must be 'asc' or 'desc'")
 	}
-	
+
 	// Validate pagination parameters
 	if params.Page < 0 {
 		return errors.New("page must be positive")
@@ -131,7 +128,7 @@ func (s *Service) validateListParams(params *domain.ListAdsParams) error {
 	if params.Limit > 100 {
 		return errors.New("limit cannot exceed 100")
 	}
-	
+
 	// Validate price filters
 	if params.MinPrice != nil && *params.MinPrice < 0 {
 		return errors.New("min_price must be non-negative")
@@ -142,18 +139,6 @@ func (s *Service) validateListParams(params *domain.ListAdsParams) error {
 	if params.MinPrice != nil && params.MaxPrice != nil && *params.MinPrice > *params.MaxPrice {
 		return errors.New("min_price cannot be greater than max_price")
 	}
-	
-	return nil
-}
 
-// GetAd returns an ad by its ID.
-func (s *Service) GetAd(ctx context.Context, adID int64) (*domain.Ad, error) {
-	ad, err := s.adRepo.FindAdByID(ctx, adID)
-	if err != nil {
-		if errors.Is(err, storage.ErrAdNotFound) {
-			return nil, services.ErrAdNotFound
-		}
-		return nil, fmt.Errorf("adRepo.FindAdByID: %w", err)
-	}
-	return ad, nil
+	return nil
 }
