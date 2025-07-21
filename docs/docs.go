@@ -22,7 +22,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Returns a list of ads, with optional sorting.",
+                "description": "Returns a list of ads with pagination and filtering.",
                 "produces": [
                     "application/json"
                 ],
@@ -50,6 +50,30 @@ const docTemplate = `{
                         "description": "Sort order (asc or desc)",
                         "name": "order",
                         "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (1-based)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of items per page (max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Minimum price filter",
+                        "name": "min_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum price filter",
+                        "name": "max_price",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -59,6 +83,15 @@ const docTemplate = `{
                             "type": "array",
                             "items": {
                                 "$ref": "#/definitions/dto.AdResponse"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
                             }
                         }
                     },

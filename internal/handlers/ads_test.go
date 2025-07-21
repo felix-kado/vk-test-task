@@ -18,28 +18,22 @@ import (
 
 // mockAdsService is a mock implementation of AdsService for testing.
 type mockAdsService struct {
-	CreateAdFunc      func(ctx context.Context, ad *domain.Ad) (int64, error)
-	ListAdsFunc       func(ctx context.Context, sortBy, order string) ([]domain.Ad, error)
-	GetUserLoginsFunc func(ctx context.Context, userIDs []int64) (map[int64]string, error)
+	CreateAdFunc func(ctx context.Context, ad *domain.Ad) (int64, error)
+	ListAdsFunc  func(ctx context.Context, params *domain.ListAdsParams) ([]domain.Ad, error)
 }
 
 func (m *mockAdsService) CreateAd(ctx context.Context, ad *domain.Ad) (int64, error) {
 	return m.CreateAdFunc(ctx, ad)
 }
 
-func (m *mockAdsService) ListAds(ctx context.Context, sortBy, order string) ([]domain.Ad, error) {
+func (m *mockAdsService) ListAds(ctx context.Context, params *domain.ListAdsParams) ([]domain.Ad, error) {
 	if m.ListAdsFunc != nil {
-		return m.ListAdsFunc(ctx, sortBy, order)
+		return m.ListAdsFunc(ctx, params)
 	}
 	return nil, nil
 }
 
-func (m *mockAdsService) GetUserLogins(ctx context.Context, userIDs []int64) (map[int64]string, error) {
-	if m.GetUserLoginsFunc != nil {
-		return m.GetUserLoginsFunc(ctx, userIDs)
-	}
-	return make(map[int64]string), nil
-}
+
 
 func TestAdsHandler_CreateAd(t *testing.T) {
 	type errorResponse struct {
@@ -143,16 +137,10 @@ func TestAdsHandler_ListAds(t *testing.T) {
 			queryParams: "",
 			userID:      1, // Authenticated user with ID 1
 			setupMock: func(m *mockAdsService) {
-				m.ListAdsFunc = func(ctx context.Context, sortBy, order string) ([]domain.Ad, error) {
+				m.ListAdsFunc = func(ctx context.Context, params *domain.ListAdsParams) ([]domain.Ad, error) {
 					return []domain.Ad{
-						{ID: 101, UserID: 1, Title: "My Own Ad"},
-						{ID: 102, UserID: 2, Title: "Someone Else's Ad"},
-					}, nil
-				}
-				m.GetUserLoginsFunc = func(ctx context.Context, userIDs []int64) (map[int64]string, error) {
-					return map[int64]string{
-						1: "test_user_1",
-						2: "test_user_2",
+						{ID: 101, UserID: 1, Title: "My Own Ad", AuthorLogin: "test_user_1"},
+						{ID: 102, UserID: 2, Title: "Someone Else's Ad", AuthorLogin: "test_user_2"},
 					}, nil
 				}
 			},
@@ -167,11 +155,10 @@ func TestAdsHandler_ListAds(t *testing.T) {
 			queryParams: "",
 			userID:      0, // No user in context
 			setupMock: func(m *mockAdsService) {
-				m.ListAdsFunc = func(ctx context.Context, sortBy, order string) ([]domain.Ad, error) {
-					return []domain.Ad{{ID: 101, UserID: 1, Title: "An Ad"}}, nil
-				}
-				m.GetUserLoginsFunc = func(ctx context.Context, userIDs []int64) (map[int64]string, error) {
-					return map[int64]string{1: "test_user_1"}, nil
+				m.ListAdsFunc = func(ctx context.Context, params *domain.ListAdsParams) ([]domain.Ad, error) {
+					return []domain.Ad{
+						{ID: 101, UserID: 1, Title: "An Ad", AuthorLogin: "test_user_1"},
+					}, nil
 				}
 			},
 			expectedStatus: http.StatusOK,
@@ -183,12 +170,50 @@ func TestAdsHandler_ListAds(t *testing.T) {
 			name:        "validation error from service",
 			queryParams: "?sort_by=invalid_field",
 			setupMock: func(m *mockAdsService) {
-				m.ListAdsFunc = func(ctx context.Context, sortBy, order string) ([]domain.Ad, error) {
+				m.ListAdsFunc = func(ctx context.Context, params *domain.ListAdsParams) ([]domain.Ad, error) {
 					return nil, fmt.Errorf("%w: invalid sort_by value", services.ErrInvalidInput)
 				}
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   `{"error":"invalid input: invalid sort_by value"}`,
+		},
+		{
+			name:        "Success with pagination and filtering",
+			queryParams: "?page=2&limit=5&min_price=100&max_price=500",
+			userID:      1,
+			setupMock: func(m *mockAdsService) {
+				m.ListAdsFunc = func(ctx context.Context, params *domain.ListAdsParams) ([]domain.Ad, error) {
+					assert.Equal(t, 2, params.Page)
+					assert.Equal(t, 5, params.Limit)
+					assert.Equal(t, int64(100), *params.MinPrice)
+					assert.Equal(t, int64(500), *params.MaxPrice)
+					return []domain.Ad{},
+						nil
+				}
+			},
+			expectedStatus: http.StatusOK,
+			expectedBodyContains: []string{"[]"},
+		},
+		{
+			name:        "Invalid page parameter",
+			queryParams: "?page=abc",
+			setupMock:   func(m *mockAdsService) {},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   `{"error":"invalid page parameter: must be a number"}`,
+		},
+		{
+			name:        "Invalid limit parameter",
+			queryParams: "?limit=abc",
+			setupMock:   func(m *mockAdsService) {},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   `{"error":"invalid limit parameter: must be a number"}`,
+		},
+		{
+			name:        "Invalid min_price parameter",
+			queryParams: "?min_price=abc",
+			setupMock:   func(m *mockAdsService) {},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   `{"error":"invalid min_price parameter: must be a number"}`,
 		},
 	}
 

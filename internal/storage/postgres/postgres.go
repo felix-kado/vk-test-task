@@ -136,24 +136,48 @@ func (s *Storage) FindAdByID(ctx context.Context, id int64) (*domain.Ad, error) 
 	return &ad, nil
 }
 
-// ListAds returns a list of ads, sorted by the given column and order.
-func (s *Storage) ListAds(ctx context.Context, sortBy, order string) ([]domain.Ad, error) {
-	// валидация sortBy / order
-
-	switch sortBy {
-	case "price", "created_at":
-	default:
-		sortBy = "created_at"
+// ListAds returns a list of ads with pagination and filtering.
+func (s *Storage) ListAds(ctx context.Context, params *domain.ListAdsParams) ([]domain.Ad, error) {
+	if params == nil {
+		return nil, fmt.Errorf("storage.ListAds: params cannot be nil")
 	}
 
-	if order != "asc" {
-		order = "desc"
+	// Build the WHERE clause for price filtering
+	var whereConditions []string
+	var args []interface{}
+	argIndex := 1
+
+	if params.MinPrice != nil {
+		whereConditions = append(whereConditions, fmt.Sprintf("price >= $%d", argIndex))
+		args = append(args, *params.MinPrice)
+		argIndex++
 	}
 
-	q := fmt.Sprintf(`SELECT id, user_id, author_login, title, text, image_url, price, created_at
-	                  FROM ads ORDER BY %s %s`, sortBy, order)
+	if params.MaxPrice != nil {
+		whereConditions = append(whereConditions, fmt.Sprintf("price <= $%d", argIndex))
+		args = append(args, *params.MaxPrice)
+		argIndex++
+	}
 
-	rows, err := s.pool.Query(ctx, q)
+	// Build the base query
+	q := "SELECT id, user_id, author_login, title, text, image_url, price, created_at FROM ads"
+
+	// Add WHERE clause if there are conditions
+	if len(whereConditions) > 0 {
+		q += " WHERE " + fmt.Sprintf("(%s)", fmt.Sprintf("%s", whereConditions[0]))
+		for i := 1; i < len(whereConditions); i++ {
+			q += " AND " + whereConditions[i]
+		}
+	}
+
+	// Add ORDER BY clause
+	q += fmt.Sprintf(" ORDER BY %s %s", params.SortBy, params.Order)
+
+	// Add LIMIT and OFFSET for pagination
+	q += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIndex, argIndex+1)
+	args = append(args, params.Limit, params.GetOffset())
+
+	rows, err := s.pool.Query(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("storage.ListAds: %w", err)
 	}

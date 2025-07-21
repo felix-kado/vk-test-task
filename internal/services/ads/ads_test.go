@@ -14,7 +14,7 @@ import (
 type mockAdRepository struct {
 	CreateAdFunc   func(ctx context.Context, ad *domain.Ad) (int64, error)
 	FindAdByIDFunc func(ctx context.Context, id int64) (*domain.Ad, error)
-	ListAdsFunc    func(ctx context.Context, sortBy, order string) ([]domain.Ad, error)
+	ListAdsFunc    func(ctx context.Context, params *domain.ListAdsParams) ([]domain.Ad, error)
 }
 
 // mockUserRepository is a mock implementation of UserRepository for testing.
@@ -37,11 +37,15 @@ func (m *mockAdRepository) FindAdByID(ctx context.Context, id int64) (*domain.Ad
 	return m.FindAdByIDFunc(ctx, id)
 }
 
-func (m *mockAdRepository) ListAds(ctx context.Context, sortBy, order string) ([]domain.Ad, error) {
+func (m *mockAdRepository) ListAds(ctx context.Context, params *domain.ListAdsParams) ([]domain.Ad, error) {
 	if m.ListAdsFunc != nil {
-		return m.ListAdsFunc(ctx, sortBy, order)
+		return m.ListAdsFunc(ctx, params)
 	}
 	return nil, nil
+}
+
+func int64Ptr(i int64) *int64 {
+	return &i
 }
 
 func TestService_CreateAd(t *testing.T) {
@@ -157,30 +161,27 @@ func TestService_CreateAd(t *testing.T) {
 
 func TestService_ListAds(t *testing.T) {
 	tests := []struct {
-		name        string
-		sortBy      string
-		order       string
-		mockRepo    *mockAdRepository
+		name         string
+		params       *domain.ListAdsParams
+		mockRepo     *mockAdRepository
 		mockUserRepo *mockUserRepository
-		expectedErr error
+		expectedErr  error
 	}{
 		{
 			name:   "Success",
-			sortBy: "price",
-			order:  "asc",
+			params: &domain.ListAdsParams{SortBy: "price", Order: "asc"},
 			mockRepo: &mockAdRepository{
-				ListAdsFunc: func(ctx context.Context, sortBy, order string) ([]domain.Ad, error) {
+				ListAdsFunc: func(ctx context.Context, params *domain.ListAdsParams) ([]domain.Ad, error) {
 					return []domain.Ad{}, nil
 				},
 			},
 			mockUserRepo: &mockUserRepository{},
-			expectedErr: nil,
+			expectedErr:  nil,
 		},
 		{
-			name:        "Invalid sort_by",
-			sortBy:      "name",
-			order:       "asc",
-			mockRepo:    &mockAdRepository{},
+			name:   "Invalid sort_by",
+			params: &domain.ListAdsParams{SortBy: "name", Order: "asc"},
+			mockRepo: &mockAdRepository{},
 			mockUserRepo: &mockUserRepository{
 				FindUserByIDFunc: func(ctx context.Context, id int64) (*domain.User, error) {
 					return &domain.User{ID: 1, Login: "testuser"}, nil
@@ -189,15 +190,57 @@ func TestService_ListAds(t *testing.T) {
 			expectedErr: services.ErrInvalidInput,
 		},
 		{
-			name:        "Invalid order",
-			sortBy:      "price",
-			order:       "descending",
-			mockRepo:    &mockAdRepository{},
+			name:   "Invalid order",
+			params: &domain.ListAdsParams{SortBy: "price", Order: "descending"},
+			mockRepo: &mockAdRepository{},
 			mockUserRepo: &mockUserRepository{
 				FindUserByIDFunc: func(ctx context.Context, id int64) (*domain.User, error) {
 					return &domain.User{ID: 1, Login: "testuser"}, nil
 				},
 			},
+			expectedErr: services.ErrInvalidInput,
+		},
+		{
+			name:   "Valid pagination",
+			params: &domain.ListAdsParams{Page: 2, Limit: 5},
+			mockRepo: &mockAdRepository{
+				ListAdsFunc: func(ctx context.Context, params *domain.ListAdsParams) ([]domain.Ad, error) {
+					return []domain.Ad{}, nil
+				},
+			},
+			mockUserRepo: &mockUserRepository{},
+			expectedErr:  nil,
+		},
+		{
+			name:   "Valid filtering",
+			params: &domain.ListAdsParams{MinPrice: int64Ptr(100), MaxPrice: int64Ptr(500)},
+			mockRepo: &mockAdRepository{
+				ListAdsFunc: func(ctx context.Context, params *domain.ListAdsParams) ([]domain.Ad, error) {
+					return []domain.Ad{}, nil
+				},
+			},
+			mockUserRepo: &mockUserRepository{},
+			expectedErr:  nil,
+		},
+		{
+			name:        "Invalid page",
+			params:      &domain.ListAdsParams{Page: -1},
+			mockRepo:    &mockAdRepository{},
+			mockUserRepo: &mockUserRepository{},
+			expectedErr: services.ErrInvalidInput,
+		},
+		{
+			name:        "Invalid limit",
+			params:      &domain.ListAdsParams{Limit: -1},
+			mockRepo:    &mockAdRepository{},
+			mockUserRepo: &mockUserRepository{},
+			expectedErr: services.ErrInvalidInput,
+		},
+		{
+			name:        "Invalid price range",
+			params:      &domain.ListAdsParams{MinPrice: int64Ptr(500), MaxPrice: int64Ptr(100)},
+			mockRepo:    &mockAdRepository{},
+			mockUserRepo: &mockUserRepository{},
 			expectedErr: services.ErrInvalidInput,
 		},
 	}
@@ -205,7 +248,7 @@ func TestService_ListAds(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			service := New(tt.mockRepo, tt.mockUserRepo)
-			ads, err := service.ListAds(context.Background(), tt.sortBy, tt.order)
+			ads, err := service.ListAds(context.Background(), tt.params)
 
 			if tt.expectedErr != nil {
 				assert.Error(t, err)
