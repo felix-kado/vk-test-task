@@ -6,7 +6,8 @@ This is a REST API for a minimal marketplace, built with Go, following clean arc
 
 1. **Prerequisites**:
    - Docker and Docker Compose installed
-   - Go 1.21+ (for local development)
+   - Go 1.24.0
+
 
 2. **Setup**:
    Copy the example environment file and fill in the required secrets:
@@ -22,17 +23,17 @@ This is a REST API for a minimal marketplace, built with Go, following clean arc
    This will start:
    - API server on port 8080
    - PostgreSQL database
-   - PgAdmin (optional, on port 5050)
-
+   - Migration service
 4. **API Documentation**:
    - Swagger UI: http://localhost:8080/swagger/index.html
    - API Base URL: http://localhost:8080/v1
 
 5. **Authentication**:
-   - All endpoints (except `/login` and `/register`) require authentication
+   - GET /ads optional authentication
+   - POST /ads require authentication
    - Include the JWT token in the `Authorization` header:
      ```
-     Authorization: Bearer YOUR_JWT_TOKEN
+     Bearer YOUR_JWT_TOKEN
      ```
    - Get a token by authenticating at `/v1/auth/login`
 
@@ -52,7 +53,6 @@ This is a REST API for a minimal marketplace, built with Go, following clean arc
 ### 1. Service Layer Validation
 - Business logic and validation rules are implemented in the service layer
 - This keeps handlers clean and focused on HTTP concerns
-- Enables reusability of validation logic across different entry points (HTTP, gRPC, CLI)
 
 ### 2. Clean Architecture with Separate Interfaces
 - Each service defines its own repository interfaces
