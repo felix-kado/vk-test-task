@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 
-	"example.com/market/internal/domain"
+	"github.com/felix-kado/vk-test-task/internal/domain"
 )
 
 // AdResponse is a DTO for the Ad model, including an ownership flag and author login.

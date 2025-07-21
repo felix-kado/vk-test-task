@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"example.com/market/internal/domain"
-	"example.com/market/internal/dto"
-	"example.com/market/internal/middleware"
+	"github.com/felix-kado/vk-test-task/internal/domain"
+	"github.com/felix-kado/vk-test-task/internal/dto"
+	"github.com/felix-kado/vk-test-task/internal/middleware"
 )
 
 // AdsService defines the interface for ad-related operations.

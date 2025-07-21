@@ -2,20 +2,20 @@
 
 help:
 	@echo "Available commands:"
-	@echo "  docker-up     - Start the docker-compose stack"
-	@echo "  docker-down   - Stop the docker-compose stack and remove volumes"
+	@echo "  compose-up     - Start the docker-compose stack"
+	@echo "  compose-down   - Stop the docker-compose stack and remove volumes"
 	@echo "  test          - Run all tests"
 	@echo "  generate      - Generate mocks"
 	@echo "  swagger       - Generate Swagger documentation"
 	@echo "  lint          - Run golangci-lint"
 	@echo "  vet           - Run go vet"
 
-docker-up:
+compose-up:
 	@echo "Starting Docker containers..."
 	@cp -n .env.example .env || true
 	docker compose up --build -d
 
-docker-down:
+compose-down:
 	@echo "Stopping Docker containers..."
 	docker compose down -v
 

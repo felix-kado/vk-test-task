@@ -9,13 +9,13 @@ import (
 	"syscall"
 	"time"
 
-	_ "example.com/market/docs"
-	"example.com/market/internal/config"
-	handlers "example.com/market/internal/handlers"
-	"example.com/market/internal/logger"
-	"example.com/market/internal/services/ads"
-	"example.com/market/internal/services/auth"
-	"example.com/market/internal/storage/postgres"
+	_ "github.com/felix-kado/vk-test-task/docs"
+	"github.com/felix-kado/vk-test-task/internal/config"
+	handlers "github.com/felix-kado/vk-test-task/internal/handlers"
+	"github.com/felix-kado/vk-test-task/internal/logger"
+	"github.com/felix-kado/vk-test-task/internal/services/ads"
+	"github.com/felix-kado/vk-test-task/internal/services/auth"
+	"github.com/felix-kado/vk-test-task/internal/storage/postgres"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 

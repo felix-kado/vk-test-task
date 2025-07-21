@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"example.com/market/internal/domain"
-	"example.com/market/internal/services"
+	"github.com/felix-kado/vk-test-task/internal/domain"
+	"github.com/felix-kado/vk-test-task/internal/services"
 	"github.com/stretchr/testify/assert"
 )
 

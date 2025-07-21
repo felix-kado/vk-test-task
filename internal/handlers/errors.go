@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"example.com/market/internal/services"
+	"github.com/felix-kado/vk-test-task/internal/services"
 )
 
 // handleServiceError maps service layer errors to HTTP responses.

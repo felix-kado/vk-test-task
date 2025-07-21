@@ -9,9 +9,9 @@ import (
 	"time"
 	"unicode"
 
-	"example.com/market/internal/domain"
-	"example.com/market/internal/services"
-	"example.com/market/internal/storage"
+	"github.com/felix-kado/vk-test-task/internal/domain"
+	"github.com/felix-kado/vk-test-task/internal/services"
+	"github.com/felix-kado/vk-test-task/internal/storage"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )

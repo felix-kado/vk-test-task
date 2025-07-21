@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"example.com/market/internal/domain"
-	"example.com/market/internal/services"
-	"example.com/market/internal/storage"
+	"github.com/felix-kado/vk-test-task/internal/domain"
+	"github.com/felix-kado/vk-test-task/internal/services"
+	"github.com/felix-kado/vk-test-task/internal/storage"
 )
 
 // AdRepository defines the interface for ad storage.

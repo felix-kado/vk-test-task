@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"net/http"
 
-	"example.com/market/internal/domain"
-	"example.com/market/internal/dto"
-	"example.com/market/internal/services"
+	"github.com/felix-kado/vk-test-task/internal/domain"
+	"github.com/felix-kado/vk-test-task/internal/dto"
+	"github.com/felix-kado/vk-test-task/internal/services"
 )
 
 // AuthService defines the interface for authentication-related operations.

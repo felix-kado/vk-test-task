@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"example.com/market/internal/domain"
+	"github.com/felix-kado/vk-test-task/internal/domain"
 )
 
 type contextKey string

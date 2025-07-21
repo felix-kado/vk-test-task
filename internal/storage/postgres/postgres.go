@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"example.com/market/internal/domain"
-	"example.com/market/internal/storage"
+	"github.com/felix-kado/vk-test-task/internal/domain"
+	"github.com/felix-kado/vk-test-task/internal/storage"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"

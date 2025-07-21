@@ -3,7 +3,7 @@ package storage
 import (
 	"context"
 
-	"example.com/market/internal/domain"
+	"github.com/felix-kado/vk-test-task/internal/domain"
 )
 
 type UserRepository interface {

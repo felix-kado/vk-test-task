@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 
-	"example.com/market/internal/domain"
+	"github.com/felix-kado/vk-test-task/internal/domain"
 )
 
 // UserResponse is a DTO for the User model, used in registration responses.

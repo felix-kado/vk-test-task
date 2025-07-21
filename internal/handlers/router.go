@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"example.com/market/internal/middleware"
+	"github.com/felix-kado/vk-test-task/internal/middleware"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 )
