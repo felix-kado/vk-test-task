@@ -28,13 +28,15 @@ func NewRouter(log *slog.Logger, authHandler *AuthHandler, adsHandler *AdsHandle
 	r.Post("/v1/register", authHandler.Register)
 	r.Post("/v1/login", authHandler.Login)
 
-	// Public ad routes
-	r.Get("/v1/ads", adsHandler.ListAds)
+
+
+		r.With(middleware.AuthOptionalCtx(authService)).Get("/v1/ads", adsHandler.ListAds)
 
 	// Protected routes
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthCtx(authService))
 		r.Post("/v1/ads", adsHandler.CreateAd)
+		
 	})
 
 	return r

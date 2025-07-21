@@ -17,6 +17,15 @@ type mockAdRepository struct {
 	ListAdsFunc    func(ctx context.Context, sortBy, order string) ([]domain.Ad, error)
 }
 
+// mockUserRepository is a mock implementation of UserRepository for testing.
+type mockUserRepository struct {
+	GetUserLoginsFunc func(ctx context.Context, userIDs []int64) (map[int64]string, error)
+}
+
+func (m *mockUserRepository) GetUserLogins(ctx context.Context, userIDs []int64) (map[int64]string, error) {
+	return m.GetUserLoginsFunc(ctx, userIDs)
+}
+
 func (m *mockAdRepository) CreateAd(ctx context.Context, ad *domain.Ad) (int64, error) {
 	return m.CreateAdFunc(ctx, ad)
 }
@@ -94,7 +103,7 @@ func TestService_CreateAd(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			service := New(tt.mockRepo)
+			service := New(tt.mockRepo, &mockUserRepository{})
 			id, err := service.CreateAd(context.Background(), tt.ad)
 
 			assert.Equal(t, tt.expectedID, id)
@@ -118,6 +127,7 @@ func TestService_ListAds(t *testing.T) {
 		sortBy      string
 		order       string
 		mockRepo    *mockAdRepository
+		mockUserRepo *mockUserRepository
 		expectedErr error
 	}{
 		{
@@ -127,6 +137,11 @@ func TestService_ListAds(t *testing.T) {
 			mockRepo: &mockAdRepository{
 				ListAdsFunc: func(ctx context.Context, sortBy, order string) ([]domain.Ad, error) {
 					return []domain.Ad{}, nil
+				},
+			},
+			mockUserRepo: &mockUserRepository{
+				GetUserLoginsFunc: func(ctx context.Context, userIDs []int64) (map[int64]string, error) {
+					return map[int64]string{1: "testuser"}, nil
 				},
 			},
 			expectedErr: nil,
@@ -149,14 +164,15 @@ func TestService_ListAds(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			service := New(tt.mockRepo)
-			_, err := service.ListAds(context.Background(), tt.sortBy, tt.order)
+			service := New(tt.mockRepo, tt.mockUserRepo)
+			ads, err := service.ListAds(context.Background(), tt.sortBy, tt.order)
 
 			if tt.expectedErr != nil {
 				assert.Error(t, err)
 				assert.True(t, errors.Is(err, tt.expectedErr), "expected error '%v', got '%v'", tt.expectedErr, err)
 			} else {
 				assert.NoError(t, err)
+				assert.NotNil(t, ads)
 			}
 		})
 	}

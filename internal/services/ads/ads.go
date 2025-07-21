@@ -19,14 +19,23 @@ type AdRepository interface {
 	ListAds(ctx context.Context, sortBy, order string) ([]domain.Ad, error)
 }
 
+// UserRepository defines the interface for user-related operations needed by ads service.
+type UserRepository interface {
+	GetUserLogins(ctx context.Context, userIDs []int64) (map[int64]string, error)
+}
+
 // Service provides ad-related operations.
 type Service struct {
-	adRepo AdRepository
+	adRepo  AdRepository
+	userRepo UserRepository
 }
 
 // New creates a new ad service.
-func New(adRepo AdRepository) *Service {
-	return &Service{adRepo: adRepo}
+func New(adRepo AdRepository, userRepo UserRepository) *Service {
+	return &Service{
+		adRepo:   adRepo,
+		userRepo: userRepo,
+	}
 }
 
 // CreateAd creates a new ad after validating it.
@@ -97,4 +106,13 @@ func (s *Service) GetAd(ctx context.Context, adID int64) (*domain.Ad, error) {
 		return nil, fmt.Errorf("adRepo.FindAdByID: %w", err)
 	}
 	return ad, nil
+}
+
+// GetUserLogins retrieves a map of user logins by their IDs.
+func (s *Service) GetUserLogins(ctx context.Context, userIDs []int64) (map[int64]string, error) {
+	logins, err := s.userRepo.GetUserLogins(ctx, userIDs)
+	if err != nil {
+		return nil, fmt.Errorf("userRepo.GetUserLogins: %w", err)
+	}
+	return logins, nil
 }

@@ -53,7 +53,7 @@ func TestAuthHandler_Register(t *testing.T) {
 				}
 			},
 			expectedStatus: http.StatusCreated,
-			expectedBody:   `{"user_id":1}`,
+			expectedBody:   `{"id":1,"login":"testuser","created_at":"0001-01-01T00:00:00Z"}`,
 		},
 		{
 			name: "validation error from service",

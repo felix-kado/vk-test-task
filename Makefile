@@ -1,4 +1,4 @@
-.PHONY: help docker-up docker-down test generate lint vet
+.PHONY: help docker-up docker-down test generate swagger lint vet
 
 help:
 	@echo "Available commands:"
@@ -6,6 +6,7 @@ help:
 	@echo "  docker-down   - Stop the docker-compose stack and remove volumes"
 	@echo "  test          - Run all tests"
 	@echo "  generate      - Generate mocks"
+	@echo "  swagger       - Generate Swagger documentation"
 	@echo "  lint          - Run golangci-lint"
 	@echo "  vet           - Run go vet"
 
@@ -25,6 +26,19 @@ test:
 generate:
 	@echo "Generating mocks..."
 	go generate ./...
+
+swagger:
+	@echo "Generating Swagger documentation..."
+	@if ! command -v swag >/dev/null 2>&1 && ! test -f ~/go/bin/swag; then \
+		echo "Installing swag..."; \
+		go install github.com/swaggo/swag/cmd/swag@latest; \
+	fi
+	@if command -v swag >/dev/null 2>&1; then \
+		swag init -g cmd/api/main.go -o ./docs; \
+	else \
+		~/go/bin/swag init -g cmd/api/main.go -o ./docs; \
+	fi
+	@echo "Swagger documentation generated successfully!"
 
 lint:
 	@echo "Running golangci-lint..."

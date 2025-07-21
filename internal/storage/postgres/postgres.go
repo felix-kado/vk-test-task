@@ -160,3 +160,35 @@ func (s *Storage) ListAds(ctx context.Context, sortBy, order string) ([]domain.A
 
 	return ads, nil
 }
+
+// GetUserLogins returns a map of userID -> login for the given user IDs.
+func (s *Storage) GetUserLogins(ctx context.Context, userIDs []int64) (map[int64]string, error) {
+	if len(userIDs) == 0 {
+		return make(map[int64]string), nil
+	}
+
+	// Build the query with placeholders for the IN clause
+	q := `SELECT id, login FROM users WHERE id = ANY($1)`
+
+	rows, err := s.pool.Query(ctx, q, userIDs)
+	if err != nil {
+		return nil, fmt.Errorf("storage.GetUserLogins: %w", err)
+	}
+	defer rows.Close()
+
+	userLogins := make(map[int64]string)
+	for rows.Next() {
+		var userID int64
+		var login string
+		if err := rows.Scan(&userID, &login); err != nil {
+			return nil, fmt.Errorf("storage.GetUserLogins scan: %w", err)
+		}
+		userLogins[userID] = login
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("storage.GetUserLogins rows: %w", err)
+	}
+
+	return userLogins, nil
+}

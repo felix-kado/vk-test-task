@@ -1,27 +1,36 @@
 basePath: /v1
 definitions:
-  domain.Ad:
+  dto.AdResponse:
     properties:
-      createdAt:
+      author_login:
+        type: string
+      created_at:
         type: string
       id:
-        format: int64
         type: integer
-      imageURL:
+      image_url:
         type: string
+      is_owner:
+        type: boolean
       price:
-        description: cents
-        format: int64
         type: integer
       text:
         type: string
       title:
         type: string
-      userID:
-        format: int64
+      user_id:
         type: integer
     type: object
-  http.AdRequest:
+  dto.UserResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      login:
+        type: string
+    type: object
+  handlers.AdRequest:
     properties:
       image_url:
         type: string
@@ -32,14 +41,14 @@ definitions:
       title:
         type: string
     type: object
-  http.LoginRequest:
+  handlers.LoginRequest:
     properties:
       login:
         type: string
       password:
         type: string
     type: object
-  http.RegistrationRequest:
+  handlers.RegistrationRequest:
     properties:
       login:
         type: string
@@ -78,7 +87,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/domain.Ad'
+              $ref: '#/definitions/dto.AdResponse'
             type: array
         "500":
           description: Internal Server Error
@@ -86,6 +95,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - ApiKeyAuth: []
       summary: List ads
       tags:
       - ads
@@ -99,7 +110,7 @@ paths:
         name: input
         required: true
         schema:
-          $ref: '#/definitions/http.AdRequest'
+          $ref: '#/definitions/handlers.AdRequest'
       produces:
       - application/json
       responses:
@@ -144,7 +155,7 @@ paths:
         name: input
         required: true
         schema:
-          $ref: '#/definitions/http.LoginRequest'
+          $ref: '#/definitions/handlers.LoginRequest'
       produces:
       - application/json
       responses:
@@ -186,17 +197,14 @@ paths:
         name: input
         required: true
         schema:
-          $ref: '#/definitions/http.RegistrationRequest'
+          $ref: '#/definitions/handlers.RegistrationRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            additionalProperties:
-              format: int64
-              type: integer
-            type: object
+            $ref: '#/definitions/dto.UserResponse'
         "400":
           description: Bad Request
           schema:

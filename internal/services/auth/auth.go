@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"time"
 	"unicode"
 
@@ -216,7 +217,7 @@ func isSpecialCharacter(r rune) bool {
 
 func (s *Service) generateToken(u *domain.User) (string, error) {
 	claims := jwt.MapClaims{
-		"sub": fmt.Sprintf("%d", u.ID),
+		"sub": strconv.FormatInt(u.ID, 10),
 		"iat": time.Now().Unix(),
 		"exp": time.Now().Add(s.tokenTTL).Unix(),
 	}

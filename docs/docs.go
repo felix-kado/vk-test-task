@@ -17,6 +17,11 @@ const docTemplate = `{
     "paths": {
         "/ads": {
             "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "description": "Returns a list of ads, with optional sorting.",
                 "produces": [
                     "application/json"
@@ -53,7 +58,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/domain.Ad"
+                                "$ref": "#/definitions/dto.AdResponse"
                             }
                         }
                     },
@@ -92,7 +97,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.AdRequest"
+                            "$ref": "#/definitions/handlers.AdRequest"
                         }
                     }
                 ],
@@ -157,7 +162,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.LoginRequest"
+                            "$ref": "#/definitions/handlers.LoginRequest"
                         }
                     }
                 ],
@@ -221,7 +226,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.RegistrationRequest"
+                            "$ref": "#/definitions/handlers.RegistrationRequest"
                         }
                     }
                 ],
@@ -229,11 +234,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "integer",
-                                "format": "int64"
-                            }
+                            "$ref": "#/definitions/dto.UserResponse"
                         }
                     },
                     "400": {
@@ -268,23 +269,26 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "domain.Ad": {
+        "dto.AdResponse": {
             "type": "object",
             "properties": {
-                "createdAt": {
+                "author_login": {
+                    "type": "string"
+                },
+                "created_at": {
                     "type": "string"
                 },
                 "id": {
-                    "type": "integer",
-                    "format": "int64"
+                    "type": "integer"
                 },
-                "imageURL": {
+                "image_url": {
                     "type": "string"
                 },
+                "is_owner": {
+                    "type": "boolean"
+                },
                 "price": {
-                    "description": "cents",
-                    "type": "integer",
-                    "format": "int64"
+                    "type": "integer"
                 },
                 "text": {
                     "type": "string"
@@ -292,13 +296,26 @@ const docTemplate = `{
                 "title": {
                     "type": "string"
                 },
-                "userID": {
-                    "type": "integer",
-                    "format": "int64"
+                "user_id": {
+                    "type": "integer"
                 }
             }
         },
-        "http.AdRequest": {
+        "dto.UserResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "login": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.AdRequest": {
             "type": "object",
             "properties": {
                 "image_url": {
@@ -315,7 +332,7 @@ const docTemplate = `{
                 }
             }
         },
-        "http.LoginRequest": {
+        "handlers.LoginRequest": {
             "type": "object",
             "properties": {
                 "login": {
@@ -326,7 +343,7 @@ const docTemplate = `{
                 }
             }
         },
-        "http.RegistrationRequest": {
+        "handlers.RegistrationRequest": {
             "type": "object",
             "properties": {
                 "login": {

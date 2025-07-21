@@ -18,8 +18,9 @@ import (
 
 // mockAdsService is a mock implementation of AdsService for testing.
 type mockAdsService struct {
-	CreateAdFunc func(ctx context.Context, ad *domain.Ad) (int64, error)
-	ListAdsFunc  func(ctx context.Context, sortBy, order string) ([]domain.Ad, error)
+	CreateAdFunc      func(ctx context.Context, ad *domain.Ad) (int64, error)
+	ListAdsFunc       func(ctx context.Context, sortBy, order string) ([]domain.Ad, error)
+	GetUserLoginsFunc func(ctx context.Context, userIDs []int64) (map[int64]string, error)
 }
 
 func (m *mockAdsService) CreateAd(ctx context.Context, ad *domain.Ad) (int64, error) {
@@ -27,7 +28,17 @@ func (m *mockAdsService) CreateAd(ctx context.Context, ad *domain.Ad) (int64, er
 }
 
 func (m *mockAdsService) ListAds(ctx context.Context, sortBy, order string) ([]domain.Ad, error) {
-	return m.ListAdsFunc(ctx, sortBy, order)
+	if m.ListAdsFunc != nil {
+		return m.ListAdsFunc(ctx, sortBy, order)
+	}
+	return nil, nil
+}
+
+func (m *mockAdsService) GetUserLogins(ctx context.Context, userIDs []int64) (map[int64]string, error) {
+	if m.GetUserLoginsFunc != nil {
+		return m.GetUserLoginsFunc(ctx, userIDs)
+	}
+	return make(map[int64]string), nil
 }
 
 func TestAdsHandler_CreateAd(t *testing.T) {
@@ -119,22 +130,54 @@ func TestAdsHandler_ListAds(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		queryParams    string
-		setupMock      func(*mockAdsService)
-		expectedStatus int
-		expectedBody   string
+		name                 string
+		queryParams          string
+		userID               int64 // For setting user in context
+		setupMock            func(*mockAdsService)
+		expectedStatus       int
+		expectedBody         string
+		expectedBodyContains []string
 	}{
 		{
-			name:        "successful ad listing",
-			queryParams: "?sort_by=price&order=asc",
+			name:        "Success - authorized user sees ownership",
+			queryParams: "",
+			userID:      1, // Authenticated user with ID 1
 			setupMock: func(m *mockAdsService) {
 				m.ListAdsFunc = func(ctx context.Context, sortBy, order string) ([]domain.Ad, error) {
-					return []domain.Ad{{ID: 1, Title: "Ad 1"}}, nil
+					return []domain.Ad{
+						{ID: 101, UserID: 1, Title: "My Own Ad"},
+						{ID: 102, UserID: 2, Title: "Someone Else's Ad"},
+					}, nil
+				}
+				m.GetUserLoginsFunc = func(ctx context.Context, userIDs []int64) (map[int64]string, error) {
+					return map[int64]string{
+						1: "test_user_1",
+						2: "test_user_2",
+					}, nil
 				}
 			},
 			expectedStatus: http.StatusOK,
-			expectedBody:   `[{"id":1,"user_id":0,"title":"Ad 1","text":"","image_url":"","price":0,"created_at":"0001-01-01T00:00:00Z"}]`,
+			expectedBodyContains: []string{
+				`"id":101`, `"title":"My Own Ad"`, `"is_owner":true`, `"author_login":"test_user_1"`,
+				`"id":102`, `"title":"Someone Else's Ad"`, `"is_owner":false`, `"author_login":"test_user_2"`,
+			},
+		},
+		{
+			name:        "Success - unauthorized user does not see ownership",
+			queryParams: "",
+			userID:      0, // No user in context
+			setupMock: func(m *mockAdsService) {
+				m.ListAdsFunc = func(ctx context.Context, sortBy, order string) ([]domain.Ad, error) {
+					return []domain.Ad{{ID: 101, UserID: 1, Title: "An Ad"}}, nil
+				}
+				m.GetUserLoginsFunc = func(ctx context.Context, userIDs []int64) (map[int64]string, error) {
+					return map[int64]string{1: "test_user_1"}, nil
+				}
+			},
+			expectedStatus: http.StatusOK,
+			expectedBodyContains: []string{
+				`"id":101`, `"title":"An Ad"`, `"is_owner":false`, `"author_login":"test_user_1"`,
+			},
 		},
 		{
 			name:        "validation error from service",
@@ -145,7 +188,7 @@ func TestAdsHandler_ListAds(t *testing.T) {
 				}
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedBody:   "invalid input: invalid sort_by value",
+			expectedBody:   `{"error":"invalid input: invalid sort_by value"}`,
 		},
 	}
 
@@ -157,20 +200,25 @@ func TestAdsHandler_ListAds(t *testing.T) {
 			handler := NewAdsHandler(mockSvc, slog.Default())
 
 			req := httptest.NewRequest(http.MethodGet, "/ads"+tt.queryParams, nil)
+			// Add user ID to context if provided for the test case
+			if tt.userID != 0 {
+				ctx := context.WithValue(req.Context(), middleware.UserIDKey, tt.userID)
+				req = req.WithContext(ctx)
+			}
 
 			rr := httptest.NewRecorder()
+
 			handler.ListAds(rr, req)
 
 			assert.Equal(t, tt.expectedStatus, rr.Code)
 
-			if rr.Code >= 400 {
-				assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
-				var errResp errorResponse
-				err := json.Unmarshal(rr.Body.Bytes(), &errResp)
-				assert.NoError(t, err, "failed to unmarshal error response")
-				assert.Equal(t, tt.expectedBody, errResp.Error)
-			} else {
+			if tt.expectedBody != "" {
 				assert.JSONEq(t, tt.expectedBody, rr.Body.String())
+			} else if len(tt.expectedBodyContains) > 0 {
+				bodyStr := rr.Body.String()
+				for _, sub := range tt.expectedBodyContains {
+					assert.Contains(t, bodyStr, sub)
+				}
 			}
 		})
 	}

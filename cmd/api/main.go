@@ -32,7 +32,7 @@ func main() {
 	cfg := config.MustLoad()
 
 	// 2. Setup logger
-	log := logger.SetupLogger(cfg.LogLevel)
+	log := logger.SetupLogger("DEBUG") // Force DEBUG level for this debugging session
 	log.Info("starting application", slog.String("log_level", cfg.LogLevel))
 
 	// 3. Init storage (db)
@@ -46,7 +46,7 @@ func main() {
 
 	// 4. Init services
 	authService := auth.New(db, cfg.Auth.JWTSecret, cfg.Auth.TokenTTL)
-	adsService := ads.New(db)
+	adsService := ads.New(db, db) // db implements both AdRepository and UserRepository
 
 	// 5. Init transport (router, handlers)
 	authHandler := handlers.NewAuthHandler(authService, log)

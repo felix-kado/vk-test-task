@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"example.com/market/internal/domain"
+	"example.com/market/internal/dto"
 	"example.com/market/internal/services"
 )
 
@@ -41,7 +42,7 @@ type RegistrationRequest struct {
 // @Accept  json
 // @Produce  json
 // @Param   input body RegistrationRequest true "Registration Info"
-// @Success 201 {object} map[string]int64
+// @Success 201 {object} dto.UserResponse
 // @Failure 400 {object} map[string]string
 // @Failure 409 {object} map[string]string
 // @Failure 500 {object} map[string]string
@@ -70,7 +71,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := map[string]int64{"user_id": user.ID}
+	resp := dto.ToUserResponse(user)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(resp)

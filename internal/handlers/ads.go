@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
 	"example.com/market/internal/domain"
+	"example.com/market/internal/dto"
 	"example.com/market/internal/middleware"
 	"example.com/market/internal/services"
 )
@@ -16,6 +18,7 @@ import (
 type AdsService interface {
 	CreateAd(ctx context.Context, ad *domain.Ad) (int64, error)
 	ListAds(ctx context.Context, sortBy, order string) ([]domain.Ad, error)
+	GetUserLogins(ctx context.Context, userIDs []int64) (map[int64]string, error)
 }
 
 // AdsHandler handles HTTP requests for ads.
@@ -98,12 +101,13 @@ func (h *AdsHandler) CreateAd(w http.ResponseWriter, r *http.Request) {
 
 // ListAds godoc
 // @Summary List ads
+// @Security ApiKeyAuth
 // @Description Returns a list of ads, with optional sorting.
 // @Tags ads
 // @Produce  json
 // @Param   sort_by query string false "Sort by field (price or created_at)" Enums(price, created_at)
 // @Param   order query string false "Sort order (asc or desc)" Enums(asc, desc)
-// @Success 200 {array} domain.Ad
+// @Success 200 {array} dto.AdResponse
 // @Failure 500 {object} map[string]string
 // @Router /ads [get]
 // ListAds handles requests to list ads.
@@ -129,9 +133,36 @@ func (h *AdsHandler) ListAds(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get current user ID from context, if available
+	rawUserID := r.Context().Value(middleware.UserIDKey)
+	h.log.Debug("raw user_id from context", slog.Any("raw_user_id", rawUserID), slog.String("type", fmt.Sprintf("%T", rawUserID)))
+
+	currentUserID, ok := rawUserID.(int64)
+	if !ok {
+		h.log.Debug("could not get user_id from context or user is not authenticated", slog.Any("user_id_from_context", rawUserID))
+		currentUserID = 0 // Ensure it's zero if not found or wrong type
+	} else {
+		h.log.Debug("successfully got user_id from context", slog.Int64("user_id", currentUserID))
+	}
+
+	// Get author logins
+	userIDs := make([]int64, len(ads))
+	for i, ad := range ads {
+		userIDs[i] = ad.UserID
+	}
+
+	userLogins, err := h.service.GetUserLogins(r.Context(), userIDs)
+	if err != nil {
+		h.log.Error("failed to get user logins", slog.String("error", err.Error()))
+		// We can still return ads, just without author logins
+		userLogins = make(map[int64]string)
+	}
+
+	// Convert to DTOs
+	adResponses := dto.ToAdResponseList(ads, userLogins, currentUserID)
+
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(ads); err != nil {
+	if err := json.NewEncoder(w).Encode(adResponses); err != nil {
 		h.log.Error("failed to encode response", slog.String("error", err.Error()))
 	}
 }
-

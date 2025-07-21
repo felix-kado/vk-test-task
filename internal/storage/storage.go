@@ -10,6 +10,8 @@ type UserRepository interface {
 	CreateUser(ctx context.Context, u *domain.User) error
 	FindByLogin(ctx context.Context, login string) (*domain.User, error)
 	FindUserByID(ctx context.Context, id int64) (*domain.User, error)
+	// GetUserLogins returns a map of userID -> login for the given user IDs
+	GetUserLogins(ctx context.Context, userIDs []int64) (map[int64]string, error)
 }
 
 type AdRepository interface {
