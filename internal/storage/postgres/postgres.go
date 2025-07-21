@@ -97,9 +97,9 @@ func (s *Storage) FindUserByID(ctx context.Context, id int64) (*domain.User, err
 
 // CreateAd creates a new ad in the database.
 func (s *Storage) CreateAd(ctx context.Context, ad *domain.Ad) (int64, error) {
-	q := `INSERT INTO ads (user_id, title, text, image_url, price) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at`
+	q := `INSERT INTO ads (user_id, author_login, title, text, image_url, price) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at`
 
-	err := s.pool.QueryRow(ctx, q, ad.UserID, ad.Title, ad.Text, ad.ImageURL, ad.Price).Scan(&ad.ID, &ad.CreatedAt)
+	err := s.pool.QueryRow(ctx, q, ad.UserID, ad.AuthorLogin, ad.Title, ad.Text, ad.ImageURL, ad.Price).Scan(&ad.ID, &ad.CreatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.ForeignKeyViolation {
@@ -145,7 +145,7 @@ func (s *Storage) ListAds(ctx context.Context, sortBy, order string) ([]domain.A
 		order = "desc"
 	}
 
-	q := fmt.Sprintf(`SELECT id, user_id, title, text, image_url, price, created_at
+	q := fmt.Sprintf(`SELECT id, user_id, author_login, title, text, image_url, price, created_at
 	                  FROM ads ORDER BY %s %s`, sortBy, order)
 
 	rows, err := s.pool.Query(ctx, q)
@@ -159,36 +159,4 @@ func (s *Storage) ListAds(ctx context.Context, sortBy, order string) ([]domain.A
 	}
 
 	return ads, nil
-}
-
-// GetUserLogins returns a map of userID -> login for the given user IDs.
-func (s *Storage) GetUserLogins(ctx context.Context, userIDs []int64) (map[int64]string, error) {
-	if len(userIDs) == 0 {
-		return make(map[int64]string), nil
-	}
-
-	// Build the query with placeholders for the IN clause
-	q := `SELECT id, login FROM users WHERE id = ANY($1)`
-
-	rows, err := s.pool.Query(ctx, q, userIDs)
-	if err != nil {
-		return nil, fmt.Errorf("storage.GetUserLogins: %w", err)
-	}
-	defer rows.Close()
-
-	userLogins := make(map[int64]string)
-	for rows.Next() {
-		var userID int64
-		var login string
-		if err := rows.Scan(&userID, &login); err != nil {
-			return nil, fmt.Errorf("storage.GetUserLogins scan: %w", err)
-		}
-		userLogins[userID] = login
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("storage.GetUserLogins rows: %w", err)
-	}
-
-	return userLogins, nil
 }

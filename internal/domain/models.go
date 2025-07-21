@@ -10,11 +10,12 @@ type User struct {
 }
 
 type Ad struct {
-	ID        int64     `json:"id"`
-	UserID    int64     `json:"user_id"`
-	Title     string    `json:"title"`
-	Text      string    `json:"text"`
-	ImageURL  string    `json:"image_url"`
-	Price     int64     `json:"price"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          int64     `json:"id"`
+	UserID      int64     `json:"user_id"`
+	Title       string    `json:"title"`
+	Text        string    `json:"text"`
+	ImageURL    string    `json:"image_url"`
+	Price       int64     `json:"price"`
+	AuthorLogin string    `json:"author_login"`
+	CreatedAt   time.Time `json:"created_at"`
 }

@@ -21,7 +21,7 @@ type AdRepository interface {
 
 // UserRepository defines the interface for user-related operations needed by ads service.
 type UserRepository interface {
-	GetUserLogins(ctx context.Context, userIDs []int64) (map[int64]string, error)
+
 }
 
 // Service provides ad-related operations.
@@ -108,11 +108,3 @@ func (s *Service) GetAd(ctx context.Context, adID int64) (*domain.Ad, error) {
 	return ad, nil
 }
 
-// GetUserLogins retrieves a map of user logins by their IDs.
-func (s *Service) GetUserLogins(ctx context.Context, userIDs []int64) (map[int64]string, error) {
-	logins, err := s.userRepo.GetUserLogins(ctx, userIDs)
-	if err != nil {
-		return nil, fmt.Errorf("userRepo.GetUserLogins: %w", err)
-	}
-	return logins, nil
-}

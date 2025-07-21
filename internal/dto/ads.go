@@ -21,8 +21,7 @@ type AdResponse struct {
 
 // ToAdResponse converts a domain.Ad to AdResponse DTO.
 // currentUserID is used to determine ownership (0 for unauthenticated users).
-// authorLogin should be provided from the storage layer.
-func ToAdResponse(ad *domain.Ad, authorLogin string, currentUserID int64) *AdResponse {
+func ToAdResponse(ad *domain.Ad, currentUserID int64) *AdResponse {
 	return &AdResponse{
 		ID:          ad.ID,
 		UserID:      ad.UserID,
@@ -31,19 +30,17 @@ func ToAdResponse(ad *domain.Ad, authorLogin string, currentUserID int64) *AdRes
 		ImageURL:    ad.ImageURL,
 		Price:       ad.Price,
 		CreatedAt:   ad.CreatedAt,
-		AuthorLogin: authorLogin,
+		AuthorLogin: ad.AuthorLogin,
 		IsOwner:     currentUserID != 0 && currentUserID == ad.UserID,
 	}
 }
 
 // ToAdResponseList converts a slice of domain.Ad to AdResponse DTOs.
-// userLogins is a map of userID -> login for efficient lookup.
 // currentUserID is used to determine ownership (0 for unauthenticated users).
-func ToAdResponseList(ads []domain.Ad, userLogins map[int64]string, currentUserID int64) []*AdResponse {
+func ToAdResponseList(ads []domain.Ad, currentUserID int64) []*AdResponse {
 	responses := make([]*AdResponse, len(ads))
-	for i, ad := range ads {
-		authorLogin := userLogins[ad.UserID]
-		responses[i] = ToAdResponse(&ad, authorLogin, currentUserID)
+	for i := range ads {
+		responses[i] = ToAdResponse(&ads[i], currentUserID)
 	}
 	return responses
 }

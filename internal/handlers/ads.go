@@ -18,7 +18,6 @@ import (
 type AdsService interface {
 	CreateAd(ctx context.Context, ad *domain.Ad) (int64, error)
 	ListAds(ctx context.Context, sortBy, order string) ([]domain.Ad, error)
-	GetUserLogins(ctx context.Context, userIDs []int64) (map[int64]string, error)
 }
 
 // AdsHandler handles HTTP requests for ads.
@@ -145,21 +144,8 @@ func (h *AdsHandler) ListAds(w http.ResponseWriter, r *http.Request) {
 		h.log.Debug("successfully got user_id from context", slog.Int64("user_id", currentUserID))
 	}
 
-	// Get author logins
-	userIDs := make([]int64, len(ads))
-	for i, ad := range ads {
-		userIDs[i] = ad.UserID
-	}
-
-	userLogins, err := h.service.GetUserLogins(r.Context(), userIDs)
-	if err != nil {
-		h.log.Error("failed to get user logins", slog.String("error", err.Error()))
-		// We can still return ads, just without author logins
-		userLogins = make(map[int64]string)
-	}
-
 	// Convert to DTOs
-	adResponses := dto.ToAdResponseList(ads, userLogins, currentUserID)
+	adResponses := dto.ToAdResponseList(ads, currentUserID)
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(adResponses); err != nil {
